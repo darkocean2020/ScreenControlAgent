@@ -1,6 +1,7 @@
 """Screen capture module using mss for high-performance screenshots."""
 
 import base64
+import threading
 from io import BytesIO
 from typing import Optional, Tuple
 
@@ -9,7 +10,11 @@ from PIL import Image
 
 
 class ScreenCapture:
-    """High-performance screen capture using mss."""
+    """High-performance screen capture using mss.
+
+    Note: mss uses thread-local storage, so we create a new instance
+    per thread to support multi-threaded usage.
+    """
 
     def __init__(self, monitor_index: int = 1):
         """
@@ -19,7 +24,13 @@ class ScreenCapture:
             monitor_index: Monitor index (0=all monitors, 1=primary monitor)
         """
         self.monitor_index = monitor_index
-        self._sct = mss.mss()
+        self._local = threading.local()
+
+    def _get_sct(self):
+        """Get thread-local mss instance."""
+        if not hasattr(self._local, 'sct'):
+            self._local.sct = mss.mss()
+        return self._local.sct
 
     def capture(self, region: Optional[Tuple[int, int, int, int]] = None) -> Image.Image:
         """
@@ -31,6 +42,8 @@ class ScreenCapture:
         Returns:
             PIL Image object
         """
+        sct = self._get_sct()
+
         if region:
             monitor = {
                 "left": region[0],
@@ -39,9 +52,9 @@ class ScreenCapture:
                 "height": region[3]
             }
         else:
-            monitor = self._sct.monitors[self.monitor_index]
+            monitor = sct.monitors[self.monitor_index]
 
-        screenshot = self._sct.grab(monitor)
+        screenshot = sct.grab(monitor)
         return Image.frombytes("RGB", screenshot.size, screenshot.bgra, "raw", "BGRX")
 
     def capture_to_base64(
@@ -78,10 +91,6 @@ class ScreenCapture:
         Returns:
             Tuple of (width, height)
         """
-        monitor = self._sct.monitors[self.monitor_index]
+        sct = self._get_sct()
+        monitor = sct.monitors[self.monitor_index]
         return monitor["width"], monitor["height"]
-
-    def __del__(self):
-        """Cleanup mss instance."""
-        if hasattr(self, "_sct"):
-            self._sct.close()

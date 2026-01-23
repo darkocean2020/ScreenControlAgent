@@ -3,11 +3,22 @@
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Optional, Tuple, List, Dict, Any, TYPE_CHECKING
+from typing import Optional, Tuple, List, Dict, Any, TYPE_CHECKING, Callable
 from PIL import Image
 
 if TYPE_CHECKING:
     from .task import TaskPlan, Subtask, ErrorEvent
+
+
+@dataclass
+class StepInfo:
+    """每一步的详细信息，用于 UI 显示"""
+    step_number: int
+    action: 'Action'
+    reasoning: str = ""           # VLM 的推理过程
+    observation: str = ""         # VLM 的观察结果
+    verification: Optional[Dict[str, Any]] = None  # 验证结果
+    mouse_position: Tuple[int, int] = (0, 0)  # 当前鼠标位置
 
 
 class ActionType(Enum):

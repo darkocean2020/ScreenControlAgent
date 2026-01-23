@@ -56,14 +56,47 @@
       "error_types": [
         "unknown"
       ]
+    },
+    {
+      "task": "打开记事本，输入 Hello World",
+      "success": true,
+      "steps": 1,
+      "actions": [
+        "Type: 'Hello World'"
+      ],
+      "timestamp": "2026-01-24T01:03:52.313259",
+      "duration_seconds": 22.40104,
+      "learned_patterns": [],
+      "error_types": []
+    },
+    {
+      "task": "Open notepad and type \"hello world\"",
+      "success": true,
+      "steps": 4,
+      "actions": [
+        "Hotkey: win",
+        "Type: 'Notepad'",
+        "Hotkey: enter",
+        "Type: 'hello world'"
+      ],
+      "timestamp": "2026-01-24T01:26:16.235275",
+      "duration_seconds": 49.24901,
+      "learned_patterns": [
+        "Sequence: hotkey -> type -> hotkey -> type"
+      ],
+      "error_types": [
+        "unknown",
+        "typing_failed"
+      ]
     }
   ],
   "patterns": {
     "open_app": [
       "Sequence: click -> hotkey -> hotkey -> hotkey -> hotkey",
-      "Sequence: hotkey -> type -> hotkey"
+      "Sequence: hotkey -> type -> hotkey",
+      "Sequence: hotkey -> type -> hotkey -> type"
     ]
   },
   "failures": {},
-  "last_updated": "2026-01-24T01:01:55.436585"
+  "last_updated": "2026-01-24T01:26:16.235653"
 }

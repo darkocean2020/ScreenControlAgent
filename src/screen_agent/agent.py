@@ -1,11 +1,15 @@
 """Main agent controller implementing the plan-execute-verify loop."""
 
+import json
+import re
 import time
 from datetime import datetime
 from enum import Enum
-from typing import Optional, Callable, Any, List
+from typing import Optional, Callable, Any, List, Tuple
 
-from .models.action import Action, ActionType, AgentState
+import pyautogui
+
+from .models.action import Action, ActionType, AgentState, StepInfo
 from .models.task import ErrorType, ErrorEvent
 from .brain.planner import Planner, PlanningMode
 from .brain.verifier import Verifier
@@ -136,7 +140,11 @@ class ScreenControlAgent:
         self.status = AgentStatus.IDLE
         self.state: Optional[AgentState] = None
 
-        self.on_step_callback: Optional[Callable[[AgentState, Action], None]] = None
+        # Callback for UI updates - receives StepInfo with reasoning/observation
+        self.on_step_callback: Optional[Callable[[StepInfo], None]] = None
+
+        # Store last VLM response for extracting reasoning/observation
+        self._last_vlm_response: str = ""
 
     def run(self, task: str) -> bool:
         """
@@ -304,9 +312,13 @@ class ScreenControlAgent:
 
         try:
             action, raw_response = self.planner.plan_next_action(self.state)
+            self._last_vlm_response = raw_response
         except Exception as e:
             logger.error(f"Planning failed: {e}")
             return False
+
+        # Parse reasoning and observation from VLM response
+        reasoning, observation = self._parse_vlm_response(raw_response)
 
         step_num = self.state.step_count + 1
 
@@ -396,9 +408,50 @@ class ScreenControlAgent:
 
         # Trigger callback if set
         if self.on_step_callback:
-            self.on_step_callback(self.state, action)
+            # Get current mouse position
+            mouse_pos = pyautogui.position()
+
+            # Get observation from verification if available
+            obs_text = observation
+            if verification_result and verification_result.get("observation"):
+                obs_text = verification_result["observation"]
+
+            step_info = StepInfo(
+                step_number=step_num,
+                action=action,
+                reasoning=reasoning,
+                observation=obs_text,
+                verification=verification_result,
+                mouse_position=(mouse_pos.x, mouse_pos.y)
+            )
+            self.on_step_callback(step_info)
 
         return True
+
+    def _parse_vlm_response(self, response: str) -> Tuple[str, str]:
+        """
+        Parse reasoning and observation from VLM response.
+
+        Args:
+            response: Raw VLM response string
+
+        Returns:
+            Tuple of (reasoning, observation)
+        """
+        reasoning = ""
+        observation = ""
+
+        try:
+            json_match = re.search(r'\{[\s\S]*\}', response)
+            if json_match:
+                data = json.loads(json_match.group())
+                reasoning = data.get("reasoning", "")
+                observation = data.get("observation", "")
+        except (json.JSONDecodeError, AttributeError):
+            # If parsing fails, try to extract from text
+            pass
+
+        return reasoning, observation
 
     def _get_current_task_description(self) -> str:
         """Get the current task or subtask description."""
