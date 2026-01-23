@@ -24,21 +24,29 @@ class Planner:
         """
         self.vlm_client = vlm_client
 
-    def plan_next_action(self, state: AgentState) -> Tuple[Action, str]:
+    def plan_next_action(self, state: AgentState, screen_size: Tuple[int, int] = None) -> Tuple[Action, str]:
         """
         Plan the next action based on current state.
 
         Args:
             state: Current agent state including screenshot and history
+            screen_size: Tuple of (width, height) for the screen
 
         Returns:
             Tuple of (Action object, raw VLM response)
         """
         history_str = self._format_action_history(state.get_recent_history())
 
+        # Get screen size from screenshot if not provided
+        if screen_size is None and state.screenshot:
+            screen_size = state.screenshot.size
+        screen_width, screen_height = screen_size or (1920, 1080)
+
         user_prompt = PLANNING_USER_PROMPT.format(
             task=state.current_task,
-            action_history=history_str or "None yet"
+            action_history=history_str or "None yet",
+            screen_width=screen_width,
+            screen_height=screen_height
         )
 
         logger.debug("Calling VLM for action planning...")

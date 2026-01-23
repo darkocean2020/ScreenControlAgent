@@ -33,6 +33,10 @@ COORDINATE TIPS:
 
 PLANNING_USER_PROMPT = """Task: {task}
 
+IMPORTANT - Screen Resolution: {screen_width}x{screen_height} pixels
+The screenshot you see is {screen_width} pixels wide and {screen_height} pixels tall.
+Coordinates must be within this range: X from 0 to {screen_width}, Y from 0 to {screen_height}.
+
 Previous actions taken:
 {action_history}
 
