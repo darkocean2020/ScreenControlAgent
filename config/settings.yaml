@@ -1,0 +1,42 @@
+# ScreenControlAgent Configuration
+
+# Agent behavior
+agent:
+  max_steps: 20
+  action_delay: 0.5
+  verify_each_step: true
+  timeout: 300
+
+# VLM provider settings
+vlm:
+  provider: "claude"  # "claude" or "openai"
+
+  claude:
+    model: "claude-sonnet-4-5-20250514"
+    max_tokens: 4096
+
+  openai:
+    model: "gpt-4o"
+    max_tokens: 4096
+
+# Screen capture settings
+screen:
+  monitor_index: 1  # 1 = primary monitor
+  jpeg_quality: 85
+  max_width: 1920
+  max_height: 1080
+
+# Execution settings
+execution:
+  mouse:
+    move_duration: 0.3
+    fail_safe: true
+  keyboard:
+    typing_interval: 0.05
+
+# Logging settings
+logging:
+  level: "INFO"
+  file: "logs/agent.log"
+  save_screenshots: false
+  screenshot_dir: "logs/screenshots"

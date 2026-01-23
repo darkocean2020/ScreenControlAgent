@@ -1,0 +1,17 @@
+# ScreenControlAgent Dependencies
+
+# VLM API clients
+anthropic>=0.39.0
+openai>=1.50.0
+
+# Screen capture and image processing
+mss>=9.0.0
+Pillow>=10.0.0
+
+# Desktop automation
+pyautogui>=0.9.54
+pyperclip>=1.8.0
+
+# Configuration
+python-dotenv>=1.0.0
+PyYAML>=6.0
