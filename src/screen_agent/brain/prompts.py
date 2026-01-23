@@ -183,3 +183,98 @@ Output your response in this exact JSON format:
     "issues": "Any problems detected, or null if none"
 }}
 """
+
+# Phase 3: Memory-enhanced planning prompt
+MEMORY_CONTEXT_TEMPLATE = """
+=== MEMORY CONTEXT ===
+{memory_content}
+=== END MEMORY ===
+"""
+
+MEMORY_ENHANCED_PLANNING_USER_PROMPT = """Task: {task}
+
+{memory_context}
+
+IMPORTANT - Screen Resolution: {screen_width}x{screen_height} pixels
+
+Previous actions taken:
+{action_history}
+
+{subtask_context}
+
+Based on the current screenshot and the memory context above, determine the next single action to take.
+- Use cached element locations if available and relevant
+- Avoid actions that previously failed
+- Learn from similar successful tasks
+
+Output your response in this exact JSON format:
+{{
+    "observation": "Brief description of what you see on screen relevant to the task",
+    "reasoning": "Why you're taking this specific action (reference memory if applicable)",
+    "action": {{
+        "type": "click|double_click|right_click|type|hotkey|scroll|wait|done",
+        "coordinates": [x, y],
+        "text": "text to type",
+        "keys": ["key1", "key2"],
+        "scroll_amount": 3,
+        "duration": 1.0
+    }}
+}}
+"""
+
+# Phase 3: Task decomposition prompt (used in task_planner.py)
+TASK_DECOMPOSITION_SYSTEM_PROMPT = """You are a task planning assistant that helps break down complex tasks into simple, executable subtasks.
+
+Your role is to:
+1. Analyze if a task needs to be decomposed
+2. If yes, break it into clear, sequential subtasks
+3. Each subtask should be independently verifiable
+
+Guidelines:
+- Simple tasks (single action) should NOT be decomposed
+- Each subtask should involve 1-3 actions maximum
+- Success criteria should be visually verifiable
+- Keep subtask descriptions clear and actionable"""
+
+# Phase 3: Subtask verification prompt
+SUBTASK_VERIFY_USER_PROMPT = """Current Subtask: {subtask_description}
+Success Criteria: {success_criteria}
+
+Based on the current screenshot, determine if this subtask has been completed.
+
+Output your response in this exact JSON format:
+{{
+    "completed": true or false,
+    "confidence": 0.0-1.0,
+    "observation": "What you see that indicates completion status",
+    "next_action_hint": "Optional hint for what to do next if not complete"
+}}
+"""
+
+# Phase 3: Error analysis prompt
+ERROR_ANALYSIS_PROMPT = """An action failed during task execution.
+
+Task: {task}
+Failed Action: {action_description}
+Verification Result: {verification_result}
+
+Analyze this failure and classify the error type.
+
+Possible error types:
+- click_missed: Click didn't hit the intended target
+- element_not_found: Target element doesn't exist or isn't visible
+- element_moved: Element location changed
+- popup_blocked: A popup or dialog is blocking the action
+- typing_failed: Text wasn't entered correctly
+- timeout: Operation took too long
+- unexpected_state: Screen is in an unexpected state
+- unknown: Cannot determine the error type
+
+Output your response in this exact JSON format:
+{{
+    "error_type": "one of the types above",
+    "confidence": 0.0-1.0,
+    "analysis": "Brief explanation of what went wrong",
+    "suggested_recovery": "What action might help recover from this error"
+}}
+"""

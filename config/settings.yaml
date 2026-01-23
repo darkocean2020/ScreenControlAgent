@@ -42,6 +42,24 @@ grounding:
   uia_max_depth: 15
   uia_cache_duration: 0.5
 
+# Memory settings (Phase 3 - 记忆系统)
+memory:
+  enabled: true
+  short_term_context_size: 10  # Number of recent observations to keep
+  long_term_storage: "data/memory.json"  # Persistent storage path
+  element_cache_ttl: 300.0  # Element cache TTL in seconds
+
+# Task planning settings (Phase 3 - 多步任务规划)
+task_planning:
+  enabled: true
+  auto_decompose: true  # Automatically decompose complex tasks
+  max_subtasks: 10  # Maximum subtasks per decomposition
+
+# Error recovery settings (Phase 3 - 错误恢复机制)
+error_recovery:
+  enabled: true
+  max_recovery_attempts: 3  # Max recovery attempts per action
+
 # Logging settings
 logging:
   level: "INFO"

@@ -55,6 +55,30 @@ class GroundingConfig:
 
 
 @dataclass
+class MemoryConfig:
+    """Memory system configuration (Phase 3)."""
+    enabled: bool = True
+    short_term_context_size: int = 10
+    long_term_storage: str = "data/memory.json"
+    element_cache_ttl: float = 300.0
+
+
+@dataclass
+class TaskPlanningConfig:
+    """Task planning configuration (Phase 3)."""
+    enabled: bool = True
+    auto_decompose: bool = True
+    max_subtasks: int = 10
+
+
+@dataclass
+class ErrorRecoveryConfig:
+    """Error recovery configuration (Phase 3)."""
+    enabled: bool = True
+    max_recovery_attempts: int = 3
+
+
+@dataclass
 class Config:
     """Main configuration class."""
     agent: AgentConfig = field(default_factory=AgentConfig)
@@ -62,6 +86,11 @@ class Config:
     screen: ScreenConfig = field(default_factory=ScreenConfig)
     execution: ExecutionConfig = field(default_factory=ExecutionConfig)
     grounding: GroundingConfig = field(default_factory=GroundingConfig)
+
+    # Phase 3 configurations
+    memory: MemoryConfig = field(default_factory=MemoryConfig)
+    task_planning: TaskPlanningConfig = field(default_factory=TaskPlanningConfig)
+    error_recovery: ErrorRecoveryConfig = field(default_factory=ErrorRecoveryConfig)
 
     anthropic_api_key: Optional[str] = None
     openai_api_key: Optional[str] = None
@@ -119,6 +148,33 @@ def load_config(config_path: Optional[str] = None) -> Config:
                 confidence_threshold=grounding_data.get("confidence_threshold", 0.4),
                 uia_max_depth=grounding_data.get("uia_max_depth", 15),
                 uia_cache_duration=grounding_data.get("uia_cache_duration", 0.5)
+            )
+
+        # Phase 3: Memory configuration
+        if "memory" in data:
+            memory_data = data["memory"]
+            config.memory = MemoryConfig(
+                enabled=memory_data.get("enabled", True),
+                short_term_context_size=memory_data.get("short_term_context_size", 10),
+                long_term_storage=memory_data.get("long_term_storage", "data/memory.json"),
+                element_cache_ttl=memory_data.get("element_cache_ttl", 300.0)
+            )
+
+        # Phase 3: Task planning configuration
+        if "task_planning" in data:
+            planning_data = data["task_planning"]
+            config.task_planning = TaskPlanningConfig(
+                enabled=planning_data.get("enabled", True),
+                auto_decompose=planning_data.get("auto_decompose", True),
+                max_subtasks=planning_data.get("max_subtasks", 10)
+            )
+
+        # Phase 3: Error recovery configuration
+        if "error_recovery" in data:
+            recovery_data = data["error_recovery"]
+            config.error_recovery = ErrorRecoveryConfig(
+                enabled=recovery_data.get("enabled", True),
+                max_recovery_attempts=recovery_data.get("max_recovery_attempts", 3)
             )
 
     config.anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
