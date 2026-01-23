@@ -34,6 +34,14 @@ execution:
   keyboard:
     typing_interval: 0.05
 
+# Grounding settings (Phase 2 - UIAutomation integration)
+grounding:
+  enabled: true
+  mode: "hybrid"  # visual_only, grounded, hybrid
+  confidence_threshold: 0.4
+  uia_max_depth: 15
+  uia_cache_duration: 0.5
+
 # Logging settings
 logging:
   level: "INFO"

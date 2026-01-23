@@ -33,16 +33,23 @@ def create_vlm_client(config):
         )
 
 
-def create_agent(config):
+def create_agent(config, planning_mode_override: str = None):
     """Create agent instance from configuration."""
     vlm_client = create_vlm_client(config)
+
+    # Determine planning mode
+    planning_mode = planning_mode_override or config.grounding.mode
+    if not config.grounding.enabled:
+        planning_mode = "visual_only"
 
     return ScreenControlAgent(
         vlm_client=vlm_client,
         max_steps=config.agent.max_steps,
         action_delay=config.agent.action_delay,
         verify_each_step=config.agent.verify_each_step,
-        monitor_index=config.screen.monitor_index
+        monitor_index=config.screen.monitor_index,
+        planning_mode=planning_mode,
+        grounding_confidence_threshold=config.grounding.confidence_threshold
     )
 
 
@@ -131,6 +138,12 @@ Examples:
         help="Disable step verification"
     )
 
+    parser.add_argument(
+        "--planning-mode",
+        choices=["visual_only", "grounded", "hybrid"],
+        help="Planning mode: visual_only (VLM coords), grounded (UIAutomation), hybrid (try grounded, fallback to visual)"
+    )
+
     args = parser.parse_args()
 
     # Setup logging
@@ -155,7 +168,7 @@ Examples:
 
     # Create agent
     try:
-        agent = create_agent(config)
+        agent = create_agent(config, planning_mode_override=args.planning_mode)
     except ValueError as e:
         logger.error(str(e))
         return 1

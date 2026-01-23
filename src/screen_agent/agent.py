@@ -2,10 +2,10 @@
 
 import time
 from enum import Enum
-from typing import Optional, Callable
+from typing import Optional, Callable, Any
 
 from .models.action import Action, ActionType, AgentState
-from .brain.planner import Planner
+from .brain.planner import Planner, PlanningMode
 from .brain.verifier import Verifier
 from .perception.screen_capture import ScreenCapture
 from .perception.vlm_client import VLMClient
@@ -43,7 +43,10 @@ class ScreenControlAgent:
         max_steps: int = 20,
         action_delay: float = 0.5,
         verify_each_step: bool = True,
-        monitor_index: int = 1
+        monitor_index: int = 1,
+        planning_mode: str = "hybrid",
+        grounding_confidence_threshold: float = 0.4,
+        uia_client: Any = None
     ):
         """
         Initialize the agent.
@@ -54,14 +57,31 @@ class ScreenControlAgent:
             action_delay: Delay between actions in seconds
             verify_each_step: Whether to verify after each action
             monitor_index: Monitor to capture (1 = primary)
+            planning_mode: Planning mode ("visual_only", "grounded", or "hybrid")
+            grounding_confidence_threshold: Minimum confidence for grounded coords
+            uia_client: Optional UIAutomation client instance
         """
         self.vlm_client = vlm_client
         self.max_steps = max_steps
         self.action_delay = action_delay
         self.verify_each_step = verify_each_step
 
+        # Parse planning mode
+        mode_map = {
+            "visual_only": PlanningMode.VISUAL_ONLY,
+            "grounded": PlanningMode.GROUNDED,
+            "hybrid": PlanningMode.HYBRID
+        }
+        self.planning_mode = mode_map.get(planning_mode.lower(), PlanningMode.HYBRID)
+        logger.info(f"Planning mode: {self.planning_mode.value}")
+
         self.screen_capture = ScreenCapture(monitor_index=monitor_index)
-        self.planner = Planner(vlm_client)
+        self.planner = Planner(
+            vlm_client,
+            mode=self.planning_mode,
+            uia_client=uia_client,
+            grounding_confidence_threshold=grounding_confidence_threshold
+        )
         self.verifier = Verifier(vlm_client)
         self.executor = ActionExecutor()
 

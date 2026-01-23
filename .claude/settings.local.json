@@ -5,7 +5,10 @@
       "WebSearch",
       "Bash(pip install:*)",
       "Bash(python -m pip install:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(while read:*)",
+      "Bash(do echo \"=== $f ===\")",
+      "Bash(done)"
     ]
   }
 }

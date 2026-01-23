@@ -30,6 +30,9 @@ class Action:
     scroll_amount: Optional[int] = None
     duration: Optional[float] = None
     description: Optional[str] = None
+    # Grounding information (Phase 2)
+    target_element_name: Optional[str] = None
+    grounding_confidence: Optional[float] = None
 
     def __str__(self) -> str:
         if self.action_type == ActionType.CLICK:

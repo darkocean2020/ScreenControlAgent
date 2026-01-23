@@ -45,12 +45,23 @@ class ExecutionConfig:
 
 
 @dataclass
+class GroundingConfig:
+    """Grounding/UIAutomation configuration (Phase 2)."""
+    enabled: bool = True
+    mode: str = "hybrid"  # visual_only, grounded, hybrid
+    confidence_threshold: float = 0.4
+    uia_max_depth: int = 15
+    uia_cache_duration: float = 0.5
+
+
+@dataclass
 class Config:
     """Main configuration class."""
     agent: AgentConfig = field(default_factory=AgentConfig)
     vlm: VLMConfig = field(default_factory=VLMConfig)
     screen: ScreenConfig = field(default_factory=ScreenConfig)
     execution: ExecutionConfig = field(default_factory=ExecutionConfig)
+    grounding: GroundingConfig = field(default_factory=GroundingConfig)
 
     anthropic_api_key: Optional[str] = None
     openai_api_key: Optional[str] = None
@@ -98,6 +109,16 @@ def load_config(config_path: Optional[str] = None) -> Config:
                 mouse_move_duration=exec_data.get("mouse", {}).get("move_duration", 0.3),
                 fail_safe=exec_data.get("mouse", {}).get("fail_safe", True),
                 typing_interval=exec_data.get("keyboard", {}).get("typing_interval", 0.05)
+            )
+
+        if "grounding" in data:
+            grounding_data = data["grounding"]
+            config.grounding = GroundingConfig(
+                enabled=grounding_data.get("enabled", True),
+                mode=grounding_data.get("mode", "hybrid"),
+                confidence_threshold=grounding_data.get("confidence_threshold", 0.4),
+                uia_max_depth=grounding_data.get("uia_max_depth", 15),
+                uia_cache_duration=grounding_data.get("uia_cache_duration", 0.5)
             )
 
     config.anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
