@@ -1,0 +1,69 @@
+{
+  "records": [
+    {
+      "task": "打开记事本，输入 Hello World",
+      "success": true,
+      "steps": 10,
+      "actions": [
+        "Click at (24, 1060)",
+        "Hotkey: enter",
+        "Hotkey: enter",
+        "Hotkey: enter",
+        "Hotkey: enter",
+        "Hotkey: enter",
+        "Click at (400, 343)",
+        "Hotkey: enter",
+        "Hotkey: enter",
+        "Hotkey: enter"
+      ],
+      "timestamp": "2026-01-24T00:57:01.899560",
+      "duration_seconds": 139.504725,
+      "learned_patterns": [
+        "Sequence: click -> hotkey -> hotkey -> hotkey -> hotkey"
+      ],
+      "error_types": [
+        "element_not_found",
+        "unknown",
+        "click_missed"
+      ]
+    },
+    {
+      "task": "打开记事本",
+      "success": true,
+      "steps": 1,
+      "actions": [
+        "Hotkey: win+s"
+      ],
+      "timestamp": "2026-01-24T00:59:49.369609",
+      "duration_seconds": 13.139183,
+      "learned_patterns": [],
+      "error_types": []
+    },
+    {
+      "task": "打开记事本",
+      "success": true,
+      "steps": 3,
+      "actions": [
+        "Hotkey: win",
+        "Type: 'Notepad'",
+        "Hotkey: enter"
+      ],
+      "timestamp": "2026-01-24T01:01:55.436375",
+      "duration_seconds": 33.216647,
+      "learned_patterns": [
+        "Sequence: hotkey -> type -> hotkey"
+      ],
+      "error_types": [
+        "unknown"
+      ]
+    }
+  ],
+  "patterns": {
+    "open_app": [
+      "Sequence: click -> hotkey -> hotkey -> hotkey -> hotkey",
+      "Sequence: hotkey -> type -> hotkey"
+    ]
+  },
+  "failures": {},
+  "last_updated": "2026-01-24T01:01:55.436585"
+}
