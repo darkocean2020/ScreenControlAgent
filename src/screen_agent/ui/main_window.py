@@ -233,10 +233,14 @@ class MainWindow(QMainWindow):
         Callback from agent when a step completes.
         Called from agent thread, so we emit a signal for thread-safe UI update.
         """
+        print(f"[Callback] Step {step_info.step_number}: {step_info.action}")
+        print(f"[Callback] Reasoning: {step_info.reasoning[:50] if step_info.reasoning else 'None'}...")
+        print(f"[Callback] Observation: {step_info.observation[:50] if step_info.observation else 'None'}...")
         self.update_overlay_signal.emit(step_info)
 
     def _update_overlay(self, step_info: StepInfo):
         """Update overlay in the main thread."""
+        print(f"[UI Update] Updating overlay for step {step_info.step_number}")
         self.overlay.update_info(step_info)
         self.progress_label.setText(f"Step {step_info.step_number}")
 

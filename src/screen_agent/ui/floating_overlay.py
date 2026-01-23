@@ -67,18 +67,7 @@ class FloatingOverlay(QWidget):
         self.action_label.setWordWrap(True)
         inner_layout.addWidget(self.action_label)
 
-        # Reasoning section
-        reasoning_header = QLabel("Reasoning:")
-        reasoning_header.setObjectName("sectionLabel")
-        inner_layout.addWidget(reasoning_header)
-
-        self.reasoning_label = QLabel("")
-        self.reasoning_label.setObjectName("contentLabel")
-        self.reasoning_label.setWordWrap(True)
-        self.reasoning_label.setMaximumHeight(80)
-        inner_layout.addWidget(self.reasoning_label)
-
-        # Observation section
+        # Observation section (at top)
         observation_header = QLabel("Observation:")
         observation_header.setObjectName("sectionLabel")
         inner_layout.addWidget(observation_header)
@@ -88,6 +77,17 @@ class FloatingOverlay(QWidget):
         self.observation_label.setWordWrap(True)
         self.observation_label.setMaximumHeight(80)
         inner_layout.addWidget(self.observation_label)
+
+        # Reasoning section (at bottom)
+        reasoning_header = QLabel("Reasoning:")
+        reasoning_header.setObjectName("sectionLabel")
+        inner_layout.addWidget(reasoning_header)
+
+        self.reasoning_label = QLabel("")
+        self.reasoning_label.setObjectName("contentLabel")
+        self.reasoning_label.setWordWrap(True)
+        self.reasoning_label.setMaximumHeight(80)
+        inner_layout.addWidget(self.reasoning_label)
 
         inner_layout.addStretch()
 

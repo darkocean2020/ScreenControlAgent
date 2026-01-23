@@ -394,7 +394,12 @@ class ScreenControlAgent:
                         coordinates=action.coordinates
                     )
 
-                return not bool(result.issues)  # Return False if issues
+                # Trigger callback even on failure
+                self._trigger_step_callback(
+                    step_num, action, reasoning, result.observation, verification_result
+                )
+
+                return False  # Return False if issues
 
             # Update memory with success
             if self.memory:
@@ -407,26 +412,41 @@ class ScreenControlAgent:
                 )
 
         # Trigger callback if set
-        if self.on_step_callback:
-            # Get current mouse position
-            mouse_pos = pyautogui.position()
-
-            # Get observation from verification if available
-            obs_text = observation
-            if verification_result and verification_result.get("observation"):
-                obs_text = verification_result["observation"]
-
-            step_info = StepInfo(
-                step_number=step_num,
-                action=action,
-                reasoning=reasoning,
-                observation=obs_text,
-                verification=verification_result,
-                mouse_position=(mouse_pos.x, mouse_pos.y)
-            )
-            self.on_step_callback(step_info)
+        self._trigger_step_callback(
+            step_num, action, reasoning, observation, verification_result
+        )
 
         return True
+
+    def _trigger_step_callback(
+        self,
+        step_num: int,
+        action: Action,
+        reasoning: str,
+        observation: str,
+        verification_result: Optional[dict]
+    ) -> None:
+        """Trigger the step callback with current state info."""
+        if not self.on_step_callback:
+            return
+
+        # Get current mouse position
+        mouse_pos = pyautogui.position()
+
+        # Get observation from verification if available
+        obs_text = observation
+        if verification_result and verification_result.get("observation"):
+            obs_text = verification_result["observation"]
+
+        step_info = StepInfo(
+            step_number=step_num,
+            action=action,
+            reasoning=reasoning,
+            observation=obs_text,
+            verification=verification_result,
+            mouse_position=(mouse_pos.x, mouse_pos.y)
+        )
+        self.on_step_callback(step_info)
 
     def _parse_vlm_response(self, response: str) -> Tuple[str, str]:
         """

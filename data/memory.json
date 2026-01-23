@@ -88,6 +88,54 @@
         "unknown",
         "typing_failed"
       ]
+    },
+    {
+      "task": "Open notepad and type \"hello world\"",
+      "success": true,
+      "steps": 4,
+      "actions": [
+        "Hotkey: win",
+        "Type: 'Notepad'",
+        "Hotkey: enter",
+        "Type: 'hello world'"
+      ],
+      "timestamp": "2026-01-24T01:30:44.866174",
+      "duration_seconds": 60.136802,
+      "learned_patterns": [
+        "Sequence: hotkey -> type -> hotkey -> type"
+      ],
+      "error_types": [
+        "unknown"
+      ]
+    },
+    {
+      "task": "Open notepad and type \"hello world\"",
+      "success": true,
+      "steps": 0,
+      "actions": [],
+      "timestamp": "2026-01-24T01:35:05.532529",
+      "duration_seconds": 9.009407,
+      "learned_patterns": [],
+      "error_types": []
+    },
+    {
+      "task": "Open notepad and type \"hello world\"",
+      "success": true,
+      "steps": 4,
+      "actions": [
+        "Hotkey: win",
+        "Type: 'Notepad'",
+        "Hotkey: enter",
+        "Type: 'hello world'"
+      ],
+      "timestamp": "2026-01-24T01:37:29.852253",
+      "duration_seconds": 54.457766,
+      "learned_patterns": [
+        "Sequence: hotkey -> type -> hotkey -> type"
+      ],
+      "error_types": [
+        "unknown"
+      ]
     }
   ],
   "patterns": {
@@ -98,5 +146,5 @@
     ]
   },
   "failures": {},
-  "last_updated": "2026-01-24T01:26:16.235653"
+  "last_updated": "2026-01-24T01:37:29.852475"
 }
