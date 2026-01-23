@@ -41,7 +41,7 @@ class VLMClient(ABC):
 class ClaudeVLMClient(VLMClient):
     """Claude API client for vision tasks."""
 
-    def __init__(self, api_key: str, model: str = "claude-sonnet-4-5-20250514"):
+    def __init__(self, api_key: str, model: str = "claude-3-5-sonnet-20241022"):
         """
         Initialize Claude client.
 

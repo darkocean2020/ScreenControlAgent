@@ -22,7 +22,7 @@ class AgentConfig:
 class VLMConfig:
     """VLM provider configuration."""
     provider: str = "claude"
-    claude_model: str = "claude-sonnet-4-5-20250514"
+    claude_model: str = "claude-3-5-sonnet-20241022"
     openai_model: str = "gpt-4o"
     max_tokens: int = 4096
 

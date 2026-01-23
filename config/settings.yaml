@@ -9,10 +9,10 @@ agent:
 
 # VLM provider settings
 vlm:
-  provider: "claude"  # "claude" or "openai"
+  provider: "openai"  # "claude" or "openai"
 
   claude:
-    model: "claude-sonnet-4-5-20250514"
+    model: "claude-3-haiku-20240307"
     max_tokens: 4096
 
   openai:
