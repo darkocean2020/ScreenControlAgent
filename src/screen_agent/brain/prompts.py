@@ -21,7 +21,7 @@ IMPORTANT GUIDELINES:
 - Coordinates are absolute screen positions in pixels
 - Be precise with click locations - aim for the center of buttons/fields
 - For Windows Start menu, use hotkey with ["win"] or click the Start button
-- After typing in a search box, you may need to wait briefly then click the result
+- IMPORTANT: After typing in Windows Start menu search, use hotkey ["enter"] to select the first result instead of clicking (search results are hard to click accurately)
 - If you see the task is completed, output action type "done"
 - Only output ONE action at a time
 
@@ -95,7 +95,12 @@ ELEMENT DESCRIPTION GUIDELINES:
   - Type of control (button, text field, menu item, link, list item)
   - Look at the element list and use names that match
 - Include approximate coordinates as backup
-- Reference elements from the provided element list when possible"""
+- Reference elements from the provided element list when possible
+
+SEARCH RESULTS HANDLING:
+- Windows Start menu search results CANNOT be reliably clicked (they don't appear in the element list)
+- After typing in Windows search, use hotkey ["enter"] to select the first/best result
+- Only click on search results if they appear in the UI ELEMENTS list above"""
 
 GROUNDED_PLANNING_USER_PROMPT = """Task: {task}
 
@@ -136,15 +141,22 @@ IMPORTANT:
 - Match element names to those in the UI ELEMENTS list above
 - The approximate_coordinates are BACKUP only - the system uses element matching first
 
-Example for clicking Notepad in search results:
+Example for opening Notepad from search results (use Enter, not click):
 {{
-    "observation": "I see the Windows search showing Notepad in the results",
-    "reasoning": "I need to click on Notepad to open it",
-    "action": {{"type": "click"}},
+    "observation": "I see the Windows search showing Notepad as the best match",
+    "reasoning": "Search results are not in the element list, so I'll press Enter to select the first result",
+    "action": {{"type": "hotkey", "keys": ["enter"]}}
+}}
+
+Example for clicking a desktop icon:
+{{
+    "observation": "I see Google Chrome icon on the desktop",
+    "reasoning": "I need to double-click on Chrome to open it",
+    "action": {{"type": "double_click"}},
     "target_element": {{
-        "name": "Notepad",
+        "name": "Google Chrome",
         "type": "list_item",
-        "approximate_coordinates": [200, 400]
+        "approximate_coordinates": [56, 1391]
     }}
 }}
 """
