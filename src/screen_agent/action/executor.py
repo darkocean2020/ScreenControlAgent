@@ -18,7 +18,8 @@ class ActionExecutor:
         self,
         mouse_move_duration: float = 0.3,
         typing_interval: float = 0.05,
-        fail_safe: bool = True
+        fail_safe: bool = True,
+        human_like: bool = True
     ):
         """
         Initialize the action executor.
@@ -27,10 +28,12 @@ class ActionExecutor:
             mouse_move_duration: Duration for mouse movements
             typing_interval: Interval between keystrokes
             fail_safe: Enable pyautogui fail-safe
+            human_like: Enable human-like mouse movements
         """
         self.mouse = MouseController(
             move_duration=mouse_move_duration,
-            fail_safe=fail_safe
+            fail_safe=fail_safe,
+            human_like=human_like
         )
         self.keyboard = KeyboardController(typing_interval=typing_interval)
 

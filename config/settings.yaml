@@ -44,6 +44,7 @@ execution:
   mouse:
     move_duration: 0.3
     fail_safe: true
+    human_like: true  # Enable human-like mouse movements (smooth, with easing)
   keyboard:
     typing_interval: 0.05
 
