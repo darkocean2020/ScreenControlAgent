@@ -322,6 +322,14 @@ class ScreenControlAgent:
 
         step_num = self.state.step_count + 1
 
+        # Store for later use
+        self.state.last_action = action
+
+        # Trigger early callback to show reasoning immediately (before execution)
+        self._trigger_step_callback(
+            step_num, action, reasoning, observation, None
+        )
+
         # Show subtask context if available
         if self.state.current_subtask:
             subtask_desc = self.state.current_subtask.description[:30]

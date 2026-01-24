@@ -136,15 +136,106 @@
       "error_types": [
         "unknown"
       ]
+    },
+    {
+      "task": "Open Minesweeper and play the game to win/complete",
+      "success": true,
+      "steps": 2,
+      "actions": [
+        "Click at (1354, 1120)",
+        "Hotkey: win"
+      ],
+      "timestamp": "2026-01-24T10:39:44.900761",
+      "duration_seconds": 45.73257,
+      "learned_patterns": [
+        "Sequence: click -> hotkey"
+      ],
+      "error_types": [
+        "element_not_found"
+      ]
+    },
+    {
+      "task": "open minesweeper and play the game to win",
+      "success": true,
+      "steps": 4,
+      "actions": [
+        "Click at (24, 2060)",
+        "Hotkey: win",
+        "Click at (304, 1326)",
+        "Click at (304, 1326)"
+      ],
+      "timestamp": "2026-01-24T10:48:45.326410",
+      "duration_seconds": 83.562135,
+      "learned_patterns": [
+        "Sequence: click -> hotkey -> click -> click"
+      ],
+      "error_types": [
+        "unknown",
+        "element_not_found",
+        "click_missed"
+      ]
+    },
+    {
+      "task": "open minesweeper and play the game to win",
+      "success": true,
+      "steps": 0,
+      "actions": [],
+      "timestamp": "2026-01-24T10:49:09.635729",
+      "duration_seconds": 9.430672,
+      "learned_patterns": [],
+      "error_types": []
+    },
+    {
+      "task": "open notepad and write \"hello world\"",
+      "success": true,
+      "steps": 4,
+      "actions": [
+        "Hotkey: win",
+        "Type: 'Notepad'",
+        "Hotkey: enter",
+        "Type: 'hello world'"
+      ],
+      "timestamp": "2026-01-24T10:55:10.724382",
+      "duration_seconds": 58.350017,
+      "learned_patterns": [
+        "Sequence: hotkey -> type -> hotkey -> type"
+      ],
+      "error_types": [
+        "unknown",
+        "element_not_found"
+      ]
+    },
+    {
+      "task": "Open the notepad and write a short story",
+      "success": true,
+      "steps": 4,
+      "actions": [
+        "Click at (24, 1060)",
+        "Type: 'Notepad'",
+        "Hotkey: enter",
+        "Type: 'Once upon a time, in...'"
+      ],
+      "timestamp": "2026-01-24T10:59:41.680243",
+      "duration_seconds": 82.755569,
+      "learned_patterns": [
+        "Sequence: click -> type -> hotkey -> type"
+      ],
+      "error_types": [
+        "unknown",
+        "element_not_found"
+      ]
     }
   ],
   "patterns": {
     "open_app": [
       "Sequence: click -> hotkey -> hotkey -> hotkey -> hotkey",
       "Sequence: hotkey -> type -> hotkey",
-      "Sequence: hotkey -> type -> hotkey -> type"
+      "Sequence: hotkey -> type -> hotkey -> type",
+      "Sequence: click -> hotkey",
+      "Sequence: click -> hotkey -> click -> click",
+      "Sequence: click -> type -> hotkey -> type"
     ]
   },
   "failures": {},
-  "last_updated": "2026-01-24T01:37:29.852475"
+  "last_updated": "2026-01-24T10:59:41.680572"
 }

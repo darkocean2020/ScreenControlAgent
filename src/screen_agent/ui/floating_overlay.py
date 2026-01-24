@@ -42,6 +42,9 @@ class FloatingOverlay(QWidget):
         self._setup_ui()
         self._setup_timer()
 
+        # Counter for periodic topmost refresh
+        self._topmost_counter = 0
+
         # Apply click-through after window is created
         QTimer.singleShot(100, self._set_click_through)
 
@@ -109,8 +112,31 @@ class FloatingOverlay(QWidget):
         except Exception as e:
             print(f"Warning: Could not set click-through: {e}")
 
+        # Force window to be topmost using Windows API
+        self._set_topmost()
+
+    def _set_topmost(self):
+        """Force window to stay on top of all other windows."""
+        try:
+            hwnd = int(self.winId())
+            # HWND_TOPMOST = -1, SWP_NOMOVE = 0x0002, SWP_NOSIZE = 0x0001
+            # SWP_NOACTIVATE = 0x0010
+            ctypes.windll.user32.SetWindowPos(
+                hwnd, -1,  # HWND_TOPMOST
+                0, 0, 0, 0,
+                0x0001 | 0x0002 | 0x0010  # SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE
+            )
+        except Exception as e:
+            print(f"Warning: Could not set topmost: {e}")
+
     def _follow_mouse(self):
         """Update window position to follow the mouse."""
+        # Periodically re-assert topmost to stay above other windows (every ~500ms)
+        self._topmost_counter += 1
+        if self._topmost_counter >= 10:
+            self._topmost_counter = 0
+            self._set_topmost()
+
         cursor_pos = QCursor.pos()
 
         # Get screen geometry to avoid going off-screen
