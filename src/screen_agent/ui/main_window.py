@@ -10,7 +10,10 @@ from PyQt5.QtWidgets import (
 
 from ..models.action import StepInfo
 from ..utils.config import load_config
-from ..perception.vlm_client import ClaudeVLMClient, OpenAIVLMClient
+from ..perception.vlm_client import (
+    ClaudeVLMClient, OpenAIVLMClient,
+    ClaudeLLMClient, OpenAILLMClient
+)
 from ..agent import ScreenControlAgent
 from .floating_overlay import FloatingOverlay
 from .styles import MAIN_WINDOW_STYLE
@@ -153,36 +156,85 @@ class MainWindow(QMainWindow):
             config = load_config()
             print(f"[UI] Config loaded, provider: {config.vlm.provider}")
 
-            # Create VLM client
-            print(f"[UI] Creating VLM client...")
-            if config.vlm.provider == "claude":
-                if not config.anthropic_api_key:
-                    QMessageBox.critical(self, "Error", "Anthropic API key not found in environment.")
-                    return
-                print(f"[UI] Using Claude model: {config.vlm.claude_model}")
-                vlm_client = ClaudeVLMClient(
-                    api_key=config.anthropic_api_key,
-                    model=config.vlm.claude_model
-                )
+            # Determine planning mode and create clients
+            llm_client = None
+            planning_mode = config.grounding.mode
+
+            if config.separated_arch.enabled:
+                # Separated architecture: VLM for perception, LLM for reasoning
+                print(f"[UI] Using SEPARATED architecture")
+                planning_mode = "separated"
+
+                # Create VLM client for perception
+                print(f"[UI] Creating VLM client for perception ({config.separated_arch.perception_model})...")
+                if config.separated_arch.perception_provider == "claude":
+                    if not config.anthropic_api_key:
+                        QMessageBox.critical(self, "Error", "Anthropic API key not found.")
+                        return
+                    vlm_client = ClaudeVLMClient(
+                        api_key=config.anthropic_api_key,
+                        model=config.separated_arch.perception_model
+                    )
+                else:
+                    if not config.openai_api_key:
+                        QMessageBox.critical(self, "Error", "OpenAI API key not found.")
+                        return
+                    vlm_client = OpenAIVLMClient(
+                        api_key=config.openai_api_key,
+                        model=config.separated_arch.perception_model
+                    )
+
+                # Create LLM client for reasoning
+                print(f"[UI] Creating LLM client for reasoning ({config.separated_arch.reasoning_model})...")
+                if config.separated_arch.reasoning_provider == "claude":
+                    if not config.anthropic_api_key:
+                        QMessageBox.critical(self, "Error", "Anthropic API key not found.")
+                        return
+                    llm_client = ClaudeLLMClient(
+                        api_key=config.anthropic_api_key,
+                        model=config.separated_arch.reasoning_model
+                    )
+                else:
+                    if not config.openai_api_key:
+                        QMessageBox.critical(self, "Error", "OpenAI API key not found.")
+                        return
+                    llm_client = OpenAILLMClient(
+                        api_key=config.openai_api_key,
+                        model=config.separated_arch.reasoning_model
+                    )
+                print(f"[UI] LLM client created")
             else:
-                if not config.openai_api_key:
-                    QMessageBox.critical(self, "Error", "OpenAI API key not found in environment.")
-                    return
-                print(f"[UI] Using OpenAI model: {config.vlm.openai_model}")
-                vlm_client = OpenAIVLMClient(
-                    api_key=config.openai_api_key,
-                    model=config.vlm.openai_model
-                )
-            print(f"[UI] VLM client created")
+                # Traditional architecture: single VLM for everything
+                print(f"[UI] Creating VLM client...")
+                if config.vlm.provider == "claude":
+                    if not config.anthropic_api_key:
+                        QMessageBox.critical(self, "Error", "Anthropic API key not found in environment.")
+                        return
+                    print(f"[UI] Using Claude model: {config.vlm.claude_model}")
+                    vlm_client = ClaudeVLMClient(
+                        api_key=config.anthropic_api_key,
+                        model=config.vlm.claude_model
+                    )
+                else:
+                    if not config.openai_api_key:
+                        QMessageBox.critical(self, "Error", "OpenAI API key not found in environment.")
+                        return
+                    print(f"[UI] Using OpenAI model: {config.vlm.openai_model}")
+                    vlm_client = OpenAIVLMClient(
+                        api_key=config.openai_api_key,
+                        model=config.vlm.openai_model
+                    )
+                print(f"[UI] VLM client created")
 
             # Create agent
             self.agent = ScreenControlAgent(
                 vlm_client=vlm_client,
+                llm_client=llm_client,
                 max_steps=config.agent.max_steps,
                 action_delay=config.agent.action_delay,
                 verify_each_step=config.agent.verify_each_step,
                 monitor_index=config.screen.monitor_index,
-                planning_mode=config.grounding.mode,
+                planning_mode=planning_mode,
                 grounding_confidence_threshold=config.grounding.confidence_threshold,
                 enable_memory=config.memory.enabled,
                 enable_task_planning=config.task_planning.enabled,
@@ -193,6 +245,9 @@ class MainWindow(QMainWindow):
 
             # Set callback for step updates
             self.agent.on_step_callback = self._on_agent_step
+
+            # Minimize main window to prevent agent from clicking on it
+            self.showMinimized()
 
             # Show overlay
             self.overlay.set_waiting()
@@ -223,6 +278,7 @@ class MainWindow(QMainWindow):
             self.agent_thread.stop()
 
         self.overlay.hide()
+        self.showNormal()  # Restore main window
         self.status_label.setText("Status: Stopped")
         self.start_btn.setEnabled(True)
         self.stop_btn.setEnabled(False)
@@ -247,6 +303,7 @@ class MainWindow(QMainWindow):
     def _on_task_finished(self, success: bool):
         """Handle task completion."""
         self.overlay.hide()
+        self.showNormal()  # Restore main window
 
         if success:
             self.status_label.setText("Status: Completed")
@@ -262,6 +319,7 @@ class MainWindow(QMainWindow):
         """Handle error from agent thread."""
         print(f"[UI] Received error signal: {error_msg}")
         self.overlay.hide()
+        self.showNormal()  # Restore main window
         self.status_label.setText("Status: Error")
         self.start_btn.setEnabled(True)
         self.stop_btn.setEnabled(False)

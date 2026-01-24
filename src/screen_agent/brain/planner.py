@@ -7,13 +7,18 @@ from typing import Tuple, Optional, Any
 
 from ..models.action import Action, ActionType, AgentState
 from ..models.ui_element import UIElementTree
-from ..perception.vlm_client import VLMClient
+from ..perception.vlm_client import VLMClient, LLMClient
 from ..utils.logger import get_logger
 from .prompts import (
     PLANNING_SYSTEM_PROMPT,
     PLANNING_USER_PROMPT,
     GROUNDED_PLANNING_SYSTEM_PROMPT,
-    GROUNDED_PLANNING_USER_PROMPT
+    GROUNDED_PLANNING_USER_PROMPT,
+    # Separated architecture prompts
+    PERCEPTION_SYSTEM_PROMPT,
+    PERCEPTION_USER_PROMPT,
+    REASONING_SYSTEM_PROMPT,
+    REASONING_USER_PROMPT
 )
 from .grounding import ElementGrounder, ElementDescription, GroundingResult
 
@@ -25,6 +30,7 @@ class PlanningMode(Enum):
     VISUAL_ONLY = "visual_only"
     GROUNDED = "grounded"
     HYBRID = "hybrid"
+    SEPARATED = "separated"  # VLM for perception, LLM for reasoning
 
 
 class Planner:
@@ -35,26 +41,34 @@ class Planner:
         vlm_client: VLMClient,
         mode: PlanningMode = PlanningMode.HYBRID,
         uia_client: Any = None,
-        grounding_confidence_threshold: float = 0.4
+        grounding_confidence_threshold: float = 0.4,
+        llm_client: Optional[LLMClient] = None
     ):
         """
         Initialize the planner.
 
         Args:
             vlm_client: VLM client for analyzing screenshots
-            mode: Planning mode (visual_only, grounded, or hybrid)
+            mode: Planning mode (visual_only, grounded, hybrid, or separated)
             uia_client: UIAutomation client (optional, created if needed)
             grounding_confidence_threshold: Minimum confidence for grounded coords
+            llm_client: LLM client for reasoning (required for separated mode)
         """
         self.vlm_client = vlm_client
+        self.llm_client = llm_client
         self.mode = mode
         self.grounding_threshold = grounding_confidence_threshold
 
-        # Initialize UIAutomation for grounded modes
+        # Validate separated mode has LLM client
+        if mode == PlanningMode.SEPARATED and llm_client is None:
+            logger.warning("Separated mode requires llm_client, falling back to hybrid")
+            self.mode = PlanningMode.HYBRID
+
+        # Initialize UIAutomation for grounded/hybrid/separated modes
         self.uia_client = None
         self.grounder = None
 
-        if mode in (PlanningMode.GROUNDED, PlanningMode.HYBRID):
+        if mode in (PlanningMode.GROUNDED, PlanningMode.HYBRID, PlanningMode.SEPARATED):
             if uia_client:
                 self.uia_client = uia_client
             else:
@@ -65,7 +79,9 @@ class Planner:
                     logger.warning(f"Failed to initialize UIAutomation: {e}")
                     if mode == PlanningMode.GROUNDED:
                         raise
-                    # For hybrid mode, fall back to visual_only
+                    # For hybrid/separated mode, fall back to visual_only
+                    if mode == PlanningMode.SEPARATED:
+                        logger.warning("UIAutomation failed, separated mode falling back to visual_only")
                     self.mode = PlanningMode.VISUAL_ONLY
 
             if self.uia_client:
@@ -96,6 +112,8 @@ class Planner:
             return self._plan_visual_only(state, history_str, screen_width, screen_height)
         elif self.mode == PlanningMode.GROUNDED:
             return self._plan_grounded(state, history_str, screen_width, screen_height)
+        elif self.mode == PlanningMode.SEPARATED:
+            return self._plan_separated(state, history_str, screen_width, screen_height)
         else:  # HYBRID
             return self._plan_hybrid(state, history_str, screen_width, screen_height)
 
@@ -216,6 +234,117 @@ class Planner:
             return self._plan_visual_only(
                 state, history_str, screen_width, screen_height
             )
+
+    def _plan_separated(
+        self,
+        state: AgentState,
+        history_str: str,
+        screen_width: int,
+        screen_height: int
+    ) -> Tuple[Action, str]:
+        """
+        Separated planning: VLM for perception, LLM for reasoning.
+
+        This approach:
+        1. VLM (fast/cheap) extracts visual information from screenshot
+        2. UIAutomation provides element coordinates
+        3. LLM (powerful) reasons about action to take
+        """
+        # Phase 1: VLM Perception - extract visual information
+        logger.debug("Phase 1: VLM Perception...")
+        perception_prompt = PERCEPTION_USER_PROMPT.format(
+            task=state.current_task,
+            screen_width=screen_width,
+            screen_height=screen_height
+        )
+
+        perception_response = self.vlm_client.analyze_screen(
+            screenshot=state.screenshot,
+            prompt=perception_prompt,
+            system_prompt=PERCEPTION_SYSTEM_PROMPT
+        )
+        logger.debug(f"Perception response: {perception_response[:200]}...")
+
+        # Phase 2: Get UI element tree from Accessibility Tree
+        element_context = ""
+        ui_tree = None
+        if self.uia_client:
+            ui_tree = self.uia_client.get_element_tree()
+            element_context = ui_tree.to_text_representation(max_elements=80)
+
+        # Phase 3: LLM Reasoning - decide action based on perception + elements
+        logger.debug("Phase 2: LLM Reasoning...")
+        reasoning_prompt = REASONING_USER_PROMPT.format(
+            task=state.current_task,
+            perception_data=perception_response,
+            element_list=element_context if element_context else "No elements detected",
+            action_history=history_str or "None yet",
+            screen_width=screen_width,
+            screen_height=screen_height
+        )
+
+        reasoning_response = self.llm_client.reason(
+            prompt=reasoning_prompt,
+            system_prompt=REASONING_SYSTEM_PROMPT
+        )
+        logger.debug(f"Reasoning response: {reasoning_response[:200]}...")
+
+        # Parse action and element description from reasoning response
+        action, element_desc = self._parse_grounded_response(reasoning_response)
+
+        # Phase 4: Ground element to get precise coordinates
+        if action.action_type in (
+            ActionType.CLICK, ActionType.DOUBLE_CLICK,
+            ActionType.RIGHT_CLICK, ActionType.MOVE
+        ) and ui_tree:
+            grounding_result = self.grounder.ground(
+                element_desc, ui_tree, (screen_width, screen_height)
+            )
+
+            if grounding_result.success:
+                action.coordinates = grounding_result.coordinates
+                action.target_element_name = element_desc.name
+                action.grounding_confidence = grounding_result.confidence
+                logger.info(
+                    f"Grounded to {grounding_result.coordinates} "
+                    f"(confidence={grounding_result.confidence:.2f})"
+                )
+            else:
+                # Use approximate coordinates from LLM response
+                if element_desc.approximate_coords:
+                    action.coordinates = element_desc.approximate_coords
+                    action.grounding_confidence = 0.0
+                    logger.warning(
+                        f"Grounding failed, using LLM coords: {action.coordinates}"
+                    )
+                else:
+                    raise ValueError("Grounding failed and no fallback coordinates")
+
+        # Combine responses for callback (perception + reasoning)
+        combined_response = json.dumps({
+            "perception": perception_response,
+            "reasoning": reasoning_response,
+            "observation": self._extract_observation(perception_response),
+            "action": {
+                "type": action.action_type.value,
+                "coordinates": list(action.coordinates) if action.coordinates else None,
+                "text": action.text,
+                "keys": action.keys
+            }
+        }, ensure_ascii=False)
+
+        return action, combined_response
+
+    def _extract_observation(self, perception_response: str) -> str:
+        """Extract observation text from perception response."""
+        try:
+            json_match = re.search(r'\{[\s\S]*\}', perception_response)
+            if json_match:
+                data = json.loads(json_match.group())
+                return data.get("screen_state", perception_response[:200])
+        except:
+            pass
+        return perception_response[:200]
 
     def _format_action_history(self, history: list) -> str:
         """Format action history for the prompt."""

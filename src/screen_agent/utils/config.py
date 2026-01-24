@@ -48,10 +48,20 @@ class ExecutionConfig:
 class GroundingConfig:
     """Grounding/UIAutomation configuration (Phase 2)."""
     enabled: bool = True
-    mode: str = "hybrid"  # visual_only, grounded, hybrid
+    mode: str = "hybrid"  # visual_only, grounded, hybrid, separated
     confidence_threshold: float = 0.4
     uia_max_depth: int = 15
     uia_cache_duration: float = 0.5
+
+
+@dataclass
+class SeparatedArchConfig:
+    """Configuration for separated VLM/LLM architecture."""
+    enabled: bool = False  # Set to True to use separated architecture
+    perception_provider: str = "openai"  # VLM for perception: openai or claude
+    perception_model: str = "gpt-4o-mini"  # Fast/cheap model for perception
+    reasoning_provider: str = "openai"  # LLM for reasoning: openai or claude
+    reasoning_model: str = "gpt-4o"  # Powerful model for reasoning
 
 
 @dataclass
@@ -91,6 +101,9 @@ class Config:
     memory: MemoryConfig = field(default_factory=MemoryConfig)
     task_planning: TaskPlanningConfig = field(default_factory=TaskPlanningConfig)
     error_recovery: ErrorRecoveryConfig = field(default_factory=ErrorRecoveryConfig)
+
+    # Separated architecture configuration
+    separated_arch: SeparatedArchConfig = field(default_factory=SeparatedArchConfig)
 
     anthropic_api_key: Optional[str] = None
     openai_api_key: Optional[str] = None
@@ -175,6 +188,17 @@ def load_config(config_path: Optional[str] = None) -> Config:
             config.error_recovery = ErrorRecoveryConfig(
                 enabled=recovery_data.get("enabled", True),
                 max_recovery_attempts=recovery_data.get("max_recovery_attempts", 3)
+            )
+
+        # Separated architecture configuration
+        if "separated_arch" in data:
+            sep_data = data["separated_arch"]
+            config.separated_arch = SeparatedArchConfig(
+                enabled=sep_data.get("enabled", False),
+                perception_provider=sep_data.get("perception_provider", "openai"),
+                perception_model=sep_data.get("perception_model", "gpt-4o-mini"),
+                reasoning_provider=sep_data.get("reasoning_provider", "openai"),
+                reasoning_model=sep_data.get("reasoning_model", "gpt-4o")
             )
 
     config.anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")

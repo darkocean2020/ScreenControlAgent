@@ -224,6 +224,70 @@
         "unknown",
         "element_not_found"
       ]
+    },
+    {
+      "task": "open minesweeper, and play the game to win",
+      "success": false,
+      "steps": 29,
+      "actions": [
+        "Click at (190, 540)",
+        "Double-click at (266, 941)",
+        "Wait 3.0s",
+        "Wait 3.0s",
+        "Click at (1276, 904)",
+        "Hotkey: win",
+        "Click at (209, 473)",
+        "Click at (199, 783)",
+        "Click at (960, 516)",
+        "Click at (32, 52)",
+        "Click at (32, 52)",
+        "Click at (960, 516)",
+        "Click at (960, 92)",
+        "Click at (32, 52)",
+        "Click at (32, 52)",
+        "Click at (32, 52)",
+        "Click at (480, 320)",
+        "Click at (540, 370)",
+        "Click at (600, 420)",
+        "Click at (960, 92)",
+        "Click at (960, 540)",
+        "Click at (960, 92)",
+        "Click at (960, 92)",
+        "Click at (960, 92)",
+        "Click at (960, 532)",
+        "Click at (960, 532)",
+        "Click at (910, 580)",
+        "Click at (960, 380)",
+        "Click at (910, 580)"
+      ],
+      "timestamp": "2026-01-24T11:14:25.327784",
+      "duration_seconds": 402.433917,
+      "learned_patterns": [],
+      "error_types": [
+        "click_missed",
+        "unknown",
+        "element_not_found"
+      ]
+    },
+    {
+      "task": "open notepad and run \"hello world\"",
+      "success": true,
+      "steps": 4,
+      "actions": [
+        "Hotkey: win",
+        "Type: 'Notepad'",
+        "Hotkey: enter",
+        "Type: 'hello world'"
+      ],
+      "timestamp": "2026-01-24T11:31:37.303224",
+      "duration_seconds": 117.137848,
+      "learned_patterns": [
+        "Sequence: hotkey -> type -> hotkey -> type"
+      ],
+      "error_types": [
+        "unknown",
+        "element_not_found"
+      ]
     }
   ],
   "patterns": {
@@ -236,6 +300,27 @@
       "Sequence: click -> type -> hotkey -> type"
     ]
   },
-  "failures": {},
-  "last_updated": "2026-01-24T10:59:41.680572"
+  "failures": {
+    "Click": [
+      "click_missed",
+      "unknown",
+      "element_not_found"
+    ],
+    "Double-click": [
+      "click_missed",
+      "unknown",
+      "element_not_found"
+    ],
+    "Wait": [
+      "click_missed",
+      "unknown",
+      "element_not_found"
+    ],
+    "Hotkey:": [
+      "click_missed",
+      "unknown",
+      "element_not_found"
+    ]
+  },
+  "last_updated": "2026-01-24T11:31:37.303558"
 }
