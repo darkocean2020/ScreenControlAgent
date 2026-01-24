@@ -1,5 +1,18 @@
 # ScreenControlAgent Configuration
 
+# Controller mode settings (LLM-driven architecture)
+controller:
+  mode: "llm_driven"  # "llm_driven" (new) or "vlm_driven" (legacy)
+
+  llm:
+    provider: "claude"
+    model: "claude-sonnet-4-20250514"
+    max_tokens: 4096
+
+  vlm_tool:
+    provider: "openai"  # VLM used for look_at_screen tool
+    model: "gpt-4o"
+
 # Agent behavior
 agent:
   max_steps: 40
