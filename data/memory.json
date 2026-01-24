@@ -288,6 +288,73 @@
         "unknown",
         "element_not_found"
       ]
+    },
+    {
+      "task": "open notepad and write \"hello world\"",
+      "success": true,
+      "steps": 1,
+      "actions": [
+        "Hotkey: win"
+      ],
+      "timestamp": "2026-01-24T11:40:23.117281",
+      "duration_seconds": 28.152183,
+      "learned_patterns": [],
+      "error_types": []
+    },
+    {
+      "task": "open notepad and write \"hello world\"",
+      "success": true,
+      "steps": 4,
+      "actions": [
+        "Hotkey: win",
+        "Type: 'notepad'",
+        "Hotkey: enter",
+        "Type: 'hello world'"
+      ],
+      "timestamp": "2026-01-24T11:47:17.398022",
+      "duration_seconds": 113.475793,
+      "learned_patterns": [
+        "Sequence: hotkey -> type -> hotkey -> type"
+      ],
+      "error_types": []
+    },
+    {
+      "task": "打开记事本，然后写一个中文小故事",
+      "success": true,
+      "steps": 5,
+      "actions": [
+        "Hotkey: win",
+        "Type: '记事本'",
+        "Hotkey: enter",
+        "Click at (847, 600)",
+        "Type: '从前，有一只小兔子住在森林深处。每天清晨...'"
+      ],
+      "timestamp": "2026-01-24T11:51:11.930249",
+      "duration_seconds": 152.736708,
+      "learned_patterns": [
+        "Sequence: hotkey -> type -> hotkey -> click -> type"
+      ],
+      "error_types": []
+    },
+    {
+      "task": "open the minesweeper and win the game",
+      "success": true,
+      "steps": 4,
+      "actions": [
+        "Type: 'minesweeper'",
+        "Hotkey: enter",
+        "Wait 2.0s",
+        "Click at (27, 1056)"
+      ],
+      "timestamp": "2026-01-24T11:53:53.193225",
+      "duration_seconds": 128.872147,
+      "learned_patterns": [
+        "Sequence: type -> hotkey -> wait -> click"
+      ],
+      "error_types": [
+        "unknown",
+        "typing_failed"
+      ]
     }
   ],
   "patterns": {
@@ -297,7 +364,9 @@
       "Sequence: hotkey -> type -> hotkey -> type",
       "Sequence: click -> hotkey",
       "Sequence: click -> hotkey -> click -> click",
-      "Sequence: click -> type -> hotkey -> type"
+      "Sequence: click -> type -> hotkey -> type",
+      "Sequence: hotkey -> type -> hotkey -> click -> type",
+      "Sequence: type -> hotkey -> wait -> click"
     ]
   },
   "failures": {
@@ -322,5 +391,5 @@
       "element_not_found"
     ]
   },
-  "last_updated": "2026-01-24T11:31:37.303558"
+  "last_updated": "2026-01-24T11:53:53.193604"
 }

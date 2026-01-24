@@ -66,9 +66,9 @@ error_recovery:
 separated_arch:
   enabled: true  # Set to true to enable separated architecture
   perception_provider: "openai"  # VLM for perception: openai or claude
-  perception_model: "gpt-4o-mini"  # Fast/cheap model for extracting visual info
-  reasoning_provider: "openai"  # LLM for reasoning: openai or claude
-  reasoning_model: "gpt-4o"  # Powerful model for decision making
+  perception_model: "gpt-4o"  # VLM for extracting visual info
+  reasoning_provider: "claude"  # LLM for reasoning: openai or claude
+  reasoning_model: "claude-opus-4-20250514"  # Powerful model for decision making
 
 # Logging settings
 logging:
