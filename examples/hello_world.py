@@ -2,13 +2,13 @@
 """
 Example: Open Notepad and type Hello World
 
-This is a simple example to verify the MVP functionality.
+This is a simple example to verify the LLM-driven functionality.
 
 Usage:
     python examples/hello_world.py
 
 Requirements:
-    - Set ANTHROPIC_API_KEY in .env file
+    - Set ANTHROPIC_API_KEY and OPENAI_API_KEY in .env file
     - Windows operating system
 """
 
@@ -18,8 +18,9 @@ import os
 # Add src to path for development
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from screen_agent.agent import ScreenControlAgent
-from screen_agent.perception.vlm_client import ClaudeVLMClient, OpenAIVLMClient
+from screen_agent.brain.llm_controller import LLMController
+from screen_agent.perception.vlm_client import OpenAIVLMClient
+from screen_agent.perception.ui_automation import UIAutomationClient
 from screen_agent.utils.config import load_config
 from screen_agent.utils.logger import setup_logger, get_logger
 
@@ -32,46 +33,44 @@ def main():
     # Load configuration
     config = load_config()
 
-    # Check API key
-    if config.vlm.provider == "claude":
-        if not config.anthropic_api_key:
-            print("Error: ANTHROPIC_API_KEY not set")
-            print("Please create a .env file with your API key:")
-            print("  ANTHROPIC_API_KEY=sk-ant-your-key-here")
-            return 1
-        vlm_client = ClaudeVLMClient(
-            api_key=config.anthropic_api_key,
-            model=config.vlm.claude_model
-        )
-    else:
-        if not config.openai_api_key:
-            print("Error: OPENAI_API_KEY not set")
-            return 1
-        vlm_client = OpenAIVLMClient(
-            api_key=config.openai_api_key,
-            model=config.vlm.openai_model
-        )
+    # Check API keys
+    if not config.anthropic_api_key:
+        print("Error: ANTHROPIC_API_KEY not set")
+        print("Please create a .env file with your API key:")
+        print("  ANTHROPIC_API_KEY=sk-ant-your-key-here")
+        return 1
 
-    # Create agent
-    agent = ScreenControlAgent(
+    if not config.openai_api_key:
+        print("Error: OPENAI_API_KEY not set")
+        print("Please create a .env file with your API key:")
+        print("  OPENAI_API_KEY=sk-your-key-here")
+        return 1
+
+    # Create VLM client (for look_at_screen tool)
+    vlm_client = OpenAIVLMClient(
+        api_key=config.openai_api_key,
+        model=config.vlm.openai_model
+    )
+
+    # Create UIAutomation client (optional but recommended)
+    uia_client = None
+    try:
+        uia_client = UIAutomationClient()
+    except Exception as e:
+        logger.warning(f"UIAutomation not available: {e}")
+
+    # Create LLM controller
+    controller = LLMController(
+        api_key=config.anthropic_api_key,
+        model="claude-sonnet-4-20250514",
         vlm_client=vlm_client,
-        max_steps=15,
-        action_delay=0.5,
-        verify_each_step=True
+        uia_client=uia_client,
+        max_tokens=4096,
+        action_delay=0.5
     )
 
     # Define task
-    task = """
-    Open Windows Notepad and type "Hello World".
-
-    Steps:
-    1. Click the Windows Start button or press the Windows key
-    2. Type "notepad" to search
-    3. Click on Notepad in the search results
-    4. Wait for Notepad to open
-    5. Type "Hello World" in the text area
-    6. The task is complete when "Hello World" is visible in Notepad
-    """
+    task = "Open Windows Notepad and type 'Hello World'"
 
     # Run
     print("=" * 50)
@@ -80,7 +79,7 @@ def main():
     print()
 
     try:
-        success = agent.run(task)
+        success = controller.run(task, max_steps=15)
 
         print()
         print("=" * 50)
@@ -88,8 +87,6 @@ def main():
             print("SUCCESS! Task completed.")
         else:
             print("FAILED. Task did not complete.")
-            if agent.state and agent.state.error_message:
-                print(f"Error: {agent.state.error_message}")
         print("=" * 50)
 
         return 0 if success else 1
