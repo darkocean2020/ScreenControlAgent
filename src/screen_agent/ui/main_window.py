@@ -434,8 +434,14 @@ class MainWindow(QMainWindow):
 
     def _on_llm_step(self, step_result: StepResult):
         """Callback from LLM controller when a tool is executed."""
-        print(f"[LLM Callback] Tool: {step_result.tool_name}")
-        print(f"[LLM Callback] Result: {step_result.tool_result[:100] if step_result.tool_result else 'None'}...")
+        try:
+            print(f"[LLM Callback] Tool: {step_result.tool_name}")
+            result_preview = step_result.tool_result[:100] if step_result.tool_result else 'None'
+            print(f"[LLM Callback] Result: {result_preview}...")
+        except UnicodeEncodeError:
+            # Handle encoding issues on Windows consoles
+            print(f"[LLM Callback] Tool: {step_result.tool_name}")
+            print("[LLM Callback] Result: (contains non-printable characters)...")
         # Convert to StepInfo-like object for overlay
         step_info = StepInfo(
             step_number=len(self.controller.get_tool_history()) if self.controller else 0,
