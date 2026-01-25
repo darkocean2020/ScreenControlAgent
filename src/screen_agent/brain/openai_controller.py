@@ -23,6 +23,19 @@ from .prompts import CONTROLLER_SYSTEM_PROMPT, LOOK_AT_SCREEN_PROMPT
 from .task_planner import TaskPlanner
 from .reflection import ReflectionWorkflow, ReflectionResult
 
+# RAG and Skills imports (optional, graceful fallback)
+try:
+    from ..rag import KnowledgeStore, KnowledgeRetriever
+    RAG_AVAILABLE = True
+except ImportError:
+    RAG_AVAILABLE = False
+
+try:
+    from ..skills import SkillRegistry, SkillExecutor, register_builtin_skills
+    SKILLS_AVAILABLE = True
+except ImportError:
+    SKILLS_AVAILABLE = False
+
 logger = get_logger(__name__)
 
 
@@ -144,12 +157,36 @@ class OpenAILLMController:
                 max_retries=reflection_max_retries
             )
 
+        # RAG system (optional)
+        self.knowledge_retriever = None
+        if RAG_AVAILABLE:
+            try:
+                knowledge_store = KnowledgeStore()
+                self.knowledge_retriever = KnowledgeRetriever(knowledge_store)
+                logger.info("RAG system initialized")
+            except Exception as e:
+                logger.warning(f"Failed to initialize RAG: {e}")
+
+        # Skills system (optional)
+        self.skill_executor = None
+        if SKILLS_AVAILABLE:
+            try:
+                register_builtin_skills()
+                self.skill_executor = SkillExecutor(
+                    action_executor=self.executor
+                )
+                logger.info("Skills system initialized")
+            except Exception as e:
+                logger.warning(f"Failed to initialize Skills: {e}")
+
         # State
         self.state: Optional[ControllerState] = None
 
         logger.info(
             f"OpenAILLMController initialized with model: {model}, "
-            f"reflection={'enabled' if self.reflection else 'disabled'}"
+            f"reflection={'enabled' if self.reflection else 'disabled'}, "
+            f"RAG={'enabled' if self.knowledge_retriever else 'disabled'}, "
+            f"Skills={'enabled' if self.skill_executor else 'disabled'}"
         )
 
     def run(self, task: str, max_steps: int = 0) -> bool:
@@ -435,11 +472,27 @@ class OpenAILLMController:
         """Call the OpenAI LLM with current messages and tools."""
         try:
             print(f"[OpenAI] Calling {self.model}...")
+
+            # Build system prompt with RAG context
+            system_prompt = CONTROLLER_SYSTEM_PROMPT
+
+            if self.knowledge_retriever and self.state:
+                try:
+                    # Retrieve relevant knowledge for the task
+                    rag_context = self.knowledge_retriever.retrieve_for_task(
+                        self.state.task,
+                        top_k=2
+                    )
+                    if rag_context:
+                        system_prompt = f"{CONTROLLER_SYSTEM_PROMPT}\n\n{rag_context}"
+                except Exception as e:
+                    logger.warning(f"RAG retrieval failed: {e}")
+
             response = self.client.chat.completions.create(
                 model=self.model,
                 max_completion_tokens=self.max_tokens,
                 messages=[
-                    {"role": "system", "content": CONTROLLER_SYSTEM_PROMPT},
+                    {"role": "system", "content": system_prompt},
                     *self.state.messages
                 ],
                 tools=self.tools,
@@ -572,6 +625,9 @@ class OpenAILLMController:
 
             elif tool_name == "click_element":
                 return self._tool_click_element(tool_input), True, False
+
+            elif tool_name == "use_skill":
+                return self._tool_use_skill(tool_input), True, False
 
             elif tool_name == "task_complete":
                 return self._tool_task_complete(tool_input), True, True
@@ -845,6 +901,27 @@ class OpenAILLMController:
             logger.error(f"click_element failed: {e}")
             return f"点击元素失败: {str(e)}"
 
+    def _tool_use_skill(self, input: Dict[str, Any]) -> str:
+        """Execute use_skill tool to invoke a pre-defined skill."""
+        skill_name = input.get("skill_name", "")
+        params = input.get("params", {})
+
+        if not self.skill_executor:
+            return f"技能系统不可用。请使用基础工具完成操作。"
+
+        try:
+            logger.info(f"Executing skill: {skill_name} with params: {params}")
+            result = self.skill_executor.execute(skill_name, params)
+
+            if result.success:
+                return f"技能 '{skill_name}' 执行成功: {result.message}\n执行了 {result.steps_executed} 个步骤"
+            else:
+                return f"技能 '{skill_name}' 执行失败: {result.message}\n错误: {result.error or 'Unknown'}"
+
+        except Exception as e:
+            logger.error(f"Skill execution failed: {e}")
+            return f"技能执行出错: {str(e)}"
+
     def _tool_task_complete(self, input: Dict[str, Any]) -> str:
         """Execute task_complete tool."""
         summary = input["summary"]
@@ -904,6 +981,11 @@ class OpenAILLMController:
             name = tool_input.get("name", "")
             click_type = tool_input.get("click_type", "single")
             return f"Click element: '{name}' ({click_type})"
+
+        elif tool_name == "use_skill":
+            skill = tool_input.get("skill_name", "")
+            params = tool_input.get("params", {})
+            return f"Use skill: {skill}({params})"
 
         elif tool_name == "task_complete":
             return f"Task complete"

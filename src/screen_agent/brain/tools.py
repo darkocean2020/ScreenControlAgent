@@ -209,11 +209,47 @@ CLICK_ELEMENT_TOOL = {
     }
 }
 
+# =============================================================================
+# Skills Tool (invoke pre-defined skills)
+# =============================================================================
+
+USE_SKILL_TOOL = {
+    "name": "use_skill",
+    "description": """调用预定义技能来执行常见任务。技能是经过优化的动作序列，比手动操作更可靠。
+
+可用技能:
+- open_app(app_name): 通过 Windows 搜索打开应用程序
+- save_file(filename): 保存当前文件（Ctrl+S + 输入文件名 + Enter）
+- navigate_to_url(url): 在浏览器中导航到指定网址
+- new_document(): 新建空白文档（Ctrl+N）
+- type_and_enter(text): 输入文本并按 Enter
+- copy_paste(target_x, target_y): 复制选中内容并粘贴到目标位置
+- confirm_dialog(action): 处理确认对话框（yes/no/ok/cancel）
+
+使用技能可以减少出错，推荐用于常见操作。""",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "skill_name": {
+                "type": "string",
+                "description": "技能名称，如 'open_app', 'save_file', 'navigate_to_url' 等"
+            },
+            "params": {
+                "type": "object",
+                "description": "技能参数，根据技能不同而不同。例如 open_app 需要 {\"app_name\": \"记事本\"}",
+                "additionalProperties": True
+            }
+        },
+        "required": ["skill_name", "params"]
+    }
+}
+
 # All tools list
 ALL_TOOLS: List[Dict[str, Any]] = [
     LOOK_AT_SCREEN_TOOL,
     FIND_ELEMENT_TOOL,
     CLICK_ELEMENT_TOOL,
+    USE_SKILL_TOOL,
     CLICK_TOOL,
     DOUBLE_CLICK_TOOL,
     RIGHT_CLICK_TOOL,
