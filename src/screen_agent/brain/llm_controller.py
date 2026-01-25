@@ -2,6 +2,8 @@
 
 This module implements the main controller where LLM is the brain
 and VLM is a tool that LLM can call when needed.
+
+Supports subtask-level reflection workflow for verification and retry.
 """
 
 import time
@@ -12,12 +14,16 @@ from typing import Optional, List, Dict, Any, Callable, Tuple
 import anthropic
 
 from ..models.action import Action, ActionType
+from ..models.task import Subtask, TaskPlan, SubtaskStatus
 from ..perception.screen_capture import ScreenCapture
 from ..perception.vlm_client import VLMClient
 from ..action.executor import ActionExecutor
+from ..memory.memory_manager import MemoryManager
 from ..utils.logger import get_logger
 from .tools import ALL_TOOLS
 from .prompts import CONTROLLER_SYSTEM_PROMPT, LOOK_AT_SCREEN_PROMPT
+from .task_planner import TaskPlanner
+from .reflection import ReflectionWorkflow, ReflectionResult
 
 logger = get_logger(__name__)
 
@@ -34,6 +40,10 @@ class ControllerState:
     start_time: Optional[datetime] = None
     messages: List[Dict[str, Any]] = field(default_factory=list)
     tool_call_history: List[Dict[str, Any]] = field(default_factory=list)
+    # Subtask tracking
+    task_plan: Optional[TaskPlan] = None
+    current_subtask: Optional[Subtask] = None
+    subtask_actions: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -62,10 +72,14 @@ class LLMController:
         model: str = "claude-sonnet-4-20250514",
         vlm_client: Optional[VLMClient] = None,
         uia_client: Optional[Any] = None,
+        memory_manager: Optional[MemoryManager] = None,
         max_tokens: int = 4096,
         monitor_index: int = 1,
         action_delay: float = 0.5,
-        on_step_callback: Optional[Callable[[StepResult], None]] = None
+        enable_reflection: bool = True,
+        reflection_max_retries: int = 2,
+        on_step_callback: Optional[Callable[[StepResult], None]] = None,
+        on_subtask_callback: Optional[Callable[[Subtask, bool], None]] = None
     ):
         """
         Initialize the LLM controller.
@@ -75,31 +89,57 @@ class LLMController:
             model: Claude model to use
             vlm_client: VLM client for look_at_screen tool
             uia_client: UIAutomation client for element detection
+            memory_manager: Memory manager for context retrieval
             max_tokens: Max tokens for LLM response
             monitor_index: Monitor index for screen capture
             action_delay: Delay between actions
+            enable_reflection: Whether to enable subtask-level reflection
+            reflection_max_retries: Max retries per subtask in reflection
             on_step_callback: Callback for each step
+            on_subtask_callback: Callback for subtask completion (subtask, success)
         """
         self.client = anthropic.Anthropic(api_key=api_key)
         self.model = model
         self.vlm_client = vlm_client
         self.uia_client = uia_client
+        self.memory_manager = memory_manager
         self.max_tokens = max_tokens
         self.action_delay = action_delay
+        self.enable_reflection = enable_reflection
         self.on_step_callback = on_step_callback
+        self.on_subtask_callback = on_subtask_callback
 
         # Initialize components
         self.screen_capture = ScreenCapture(monitor_index=monitor_index)
         self.executor = ActionExecutor()
 
+        # Task planner (optional, requires VLM)
+        self.task_planner: Optional[TaskPlanner] = None
+        if vlm_client:
+            self.task_planner = TaskPlanner(vlm_client)
+
+        # Reflection workflow (optional, requires VLM)
+        self.reflection: Optional[ReflectionWorkflow] = None
+        if enable_reflection and vlm_client:
+            self.reflection = ReflectionWorkflow(
+                vlm_client=vlm_client,
+                memory_manager=memory_manager,
+                max_retries=reflection_max_retries
+            )
+
         # State
         self.state: Optional[ControllerState] = None
 
-        logger.info(f"LLMController initialized with model: {model}")
+        logger.info(
+            f"LLMController initialized with model: {model}, "
+            f"reflection={'enabled' if self.reflection else 'disabled'}"
+        )
 
     def run(self, task: str, max_steps: int = 0) -> bool:
         """
         Execute a task using the LLM controller.
+
+        Supports subtask decomposition and reflection workflow when enabled.
 
         Args:
             task: Natural language task description
@@ -120,43 +160,23 @@ class LLMController:
             start_time=datetime.now()
         )
 
-        # Initial user message
-        self.state.messages = [{
-            "role": "user",
-            "content": f"任务: {task}\n\n请完成这个任务。首先使用 look_at_screen 工具查看当前屏幕状态，然后根据观察结果执行相应操作。"
-        }]
+        # Start memory session if available
+        if self.memory_manager:
+            self.memory_manager.start_session(task)
 
         try:
-            while self.state.step_count < max_steps:
-                if self.state.is_completed:
-                    logger.info("Task completed successfully!")
-                    return True
+            # Check if task needs decomposition
+            if self.task_planner and self.task_planner.should_decompose(task):
+                screenshot = self.screen_capture.capture()
+                plan = self.task_planner.decompose(task, screenshot)
+                self.state.task_plan = plan
 
-                if self.state.is_failed:
-                    logger.error(f"Task failed: {self.state.error_message}")
-                    return False
+                if len(plan.subtasks) > 1:
+                    logger.info(f"Task decomposed into {len(plan.subtasks)} subtasks")
+                    return self._run_with_subtasks(plan, max_steps)
 
-                # Call LLM
-                response = self._call_llm()
-
-                if response is None:
-                    logger.error("LLM call failed")
-                    return False
-
-                # Process response
-                should_continue = self._process_response(response)
-
-                if not should_continue:
-                    break
-
-                self.state.step_count += 1
-                time.sleep(self.action_delay)
-
-            if not self.state.is_completed:
-                logger.warning(f"Reached max steps ({max_steps}) without completing task")
-                return False
-
-            return True
+            # No decomposition, run directly
+            return self._run_direct(task, max_steps)
 
         except KeyboardInterrupt:
             logger.info("Task interrupted by user")
@@ -166,6 +186,268 @@ class LLMController:
             self.state.is_failed = True
             self.state.error_message = str(e)
             raise
+        finally:
+            # Save memory session
+            if self.memory_manager:
+                learned_patterns = self._extract_learned_patterns()
+                self.memory_manager.save_session(
+                    self.state.is_completed,
+                    learned_patterns
+                )
+
+    def _run_with_subtasks(self, plan: TaskPlan, max_steps: int) -> bool:
+        """
+        Execute task with subtask decomposition and reflection.
+
+        Args:
+            plan: The task plan with subtasks
+            max_steps: Maximum total steps
+
+        Returns:
+            True if all subtasks completed successfully
+        """
+        plan.start()
+
+        for subtask in plan.subtasks:
+            logger.info(f"Starting subtask {subtask.id}: {subtask.description[:50]}...")
+            self.state.current_subtask = subtask
+            self.state.subtask_actions.clear()
+            subtask.start()
+
+            # Execute subtask with reflection
+            success = self._execute_subtask_with_reflection(subtask, max_steps)
+
+            if success:
+                subtask.complete()
+                logger.info(f"Subtask {subtask.id} completed")
+            else:
+                subtask.fail("Subtask execution failed after retries")
+                logger.warning(f"Subtask {subtask.id} failed")
+
+            # Callback
+            if self.on_subtask_callback:
+                self.on_subtask_callback(subtask, success)
+
+            # Check if we should continue
+            if not success and subtask.status == SubtaskStatus.FAILED:
+                # Could implement skip logic here
+                logger.error(f"Stopping due to subtask failure: {subtask.id}")
+                self.state.is_failed = True
+                return False
+
+            if self.state.step_count >= max_steps:
+                logger.warning("Reached max steps during subtask execution")
+                return False
+
+        self.state.is_completed = True
+        logger.info("All subtasks completed successfully")
+        return True
+
+    def _execute_subtask_with_reflection(
+        self,
+        subtask: Subtask,
+        max_steps: int
+    ) -> bool:
+        """
+        Execute a single subtask with reflection and retry.
+
+        Args:
+            subtask: The subtask to execute
+            max_steps: Global max steps limit
+
+        Returns:
+            True if subtask completed successfully
+        """
+        max_retries = self.reflection.max_retries if self.reflection else 0
+
+        for attempt in range(max_retries + 1):
+            logger.info(f"Subtask attempt {attempt + 1}/{max_retries + 1}")
+
+            # Execute the subtask
+            self._execute_subtask_actions(subtask, max_steps)
+
+            # Verify with reflection
+            if self.reflection:
+                screenshot = self.screen_capture.capture()
+                result = self.reflection.verify_subtask(
+                    subtask,
+                    screenshot,
+                    self.state.subtask_actions
+                )
+
+                if result.subtask_completed:
+                    self.reflection.record_outcome(
+                        subtask, True, attempt + 1
+                    )
+                    return True
+
+                # If not completed and should retry
+                if result.should_retry and attempt < max_retries:
+                    logger.info(f"Subtask not complete, reflecting for retry...")
+
+                    # Reflect on failure to get alternative approach
+                    reflection_result = self.reflection.reflect_on_failure(
+                        subtask,
+                        screenshot,
+                        self.state.subtask_actions,
+                        result
+                    )
+
+                    if reflection_result.suggested_approach:
+                        # Inject alternative approach hint
+                        self._inject_reflection_hint(reflection_result)
+
+                    # Clear actions for retry
+                    self.state.subtask_actions.clear()
+                    continue
+                else:
+                    # No more retries
+                    self.reflection.record_outcome(
+                        subtask, False, attempt + 1
+                    )
+                    return False
+            else:
+                # No reflection, assume success if task_complete was called
+                return self.state.is_completed
+
+        return False
+
+    def _execute_subtask_actions(self, subtask: Subtask, max_steps: int) -> None:
+        """
+        Execute actions for a subtask until completion or step limit.
+
+        Args:
+            subtask: The current subtask
+            max_steps: Global max steps
+        """
+        # Build initial message for this subtask
+        subtask_prompt = (
+            f"当前子任务: {subtask.description}\n"
+            f"成功标准: {subtask.success_criteria}\n\n"
+            f"请完成这个子任务。首先使用 look_at_screen 工具查看当前屏幕状态。"
+        )
+
+        # If we have previous context, include it
+        if len(self.state.messages) > 0:
+            self.state.messages.append({
+                "role": "user",
+                "content": subtask_prompt
+            })
+        else:
+            self.state.messages = [{
+                "role": "user",
+                "content": f"总任务: {self.state.task}\n\n{subtask_prompt}"
+            }]
+
+        # Execute until subtask seems complete or limits reached
+        subtask_steps = 0
+        max_subtask_steps = min(20, max_steps - self.state.step_count)
+
+        while subtask_steps < max_subtask_steps:
+            if self.state.is_completed:
+                break
+
+            response = self._call_llm()
+            if response is None:
+                break
+
+            should_continue = self._process_response(response)
+            subtask_steps += 1
+            self.state.step_count += 1
+
+            if not should_continue:
+                break
+
+            time.sleep(self.action_delay)
+
+    def _inject_reflection_hint(self, result: ReflectionResult) -> None:
+        """
+        Inject reflection hint into the conversation for retry.
+
+        Args:
+            result: The reflection result with suggested approach
+        """
+        hint_message = (
+            f"[反思] 上次尝试未成功完成子任务。\n"
+            f"失败原因: {result.failure_reason}\n"
+            f"建议方案: {result.suggested_approach}\n\n"
+            f"请根据上述建议，尝试用不同的方法完成子任务。"
+        )
+
+        self.state.messages.append({
+            "role": "user",
+            "content": hint_message
+        })
+
+        logger.info(f"Injected reflection hint: {result.suggested_approach[:100]}...")
+
+    def _run_direct(self, task: str, max_steps: int) -> bool:
+        """
+        Run task directly without subtask decomposition.
+
+        Args:
+            task: Task description
+            max_steps: Maximum steps
+
+        Returns:
+            True if completed successfully
+        """
+        # Initial user message
+        self.state.messages = [{
+            "role": "user",
+            "content": f"任务: {task}\n\n请完成这个任务。首先使用 look_at_screen 工具查看当前屏幕状态，然后根据观察结果执行相应操作。"
+        }]
+
+        while self.state.step_count < max_steps:
+            if self.state.is_completed:
+                logger.info("Task completed successfully!")
+                return True
+
+            if self.state.is_failed:
+                logger.error(f"Task failed: {self.state.error_message}")
+                return False
+
+            # Call LLM
+            response = self._call_llm()
+
+            if response is None:
+                logger.error("LLM call failed")
+                return False
+
+            # Process response
+            should_continue = self._process_response(response)
+
+            if not should_continue:
+                break
+
+            self.state.step_count += 1
+            time.sleep(self.action_delay)
+
+        if not self.state.is_completed:
+            logger.warning(f"Reached max steps ({max_steps}) without completing task")
+            return False
+
+        return True
+
+    def _extract_learned_patterns(self) -> List[str]:
+        """Extract learned patterns from the execution for memory."""
+        patterns = []
+
+        if not self.state or not self.state.tool_call_history:
+            return patterns
+
+        # Extract action sequence pattern
+        actions = []
+        for call in self.state.tool_call_history[-10:]:
+            tool = call.get("tool", "")
+            if tool not in ["look_at_screen", "task_complete"]:
+                actions.append(tool)
+
+        if len(actions) >= 2:
+            pattern = "Sequence: " + " -> ".join(actions[:5])
+            patterns.append(pattern)
+
+        return patterns
 
     def _call_llm(self) -> Optional[anthropic.types.Message]:
         """Call the LLM with current messages and tools."""
@@ -230,6 +512,11 @@ class LLMController:
                     "result": result[:500] if len(result) > 500 else result,
                     "success": success
                 })
+
+                # Track subtask actions for reflection
+                if self.state.current_subtask and tool_name not in ["look_at_screen"]:
+                    action_desc = self._format_action_description(tool_name, tool_input)
+                    self.state.subtask_actions.append(action_desc)
 
                 # Callback
                 if self.on_step_callback:
@@ -476,3 +763,59 @@ class LLMController:
         if self.state:
             return self.state.tool_call_history
         return []
+
+    def _format_action_description(
+        self,
+        tool_name: str,
+        tool_input: Dict[str, Any]
+    ) -> str:
+        """
+        Format a tool call as a human-readable action description.
+
+        Args:
+            tool_name: Name of the tool
+            tool_input: Tool input parameters
+
+        Returns:
+            Human-readable action description
+        """
+        if tool_name == "click":
+            x, y = tool_input.get("x", 0), tool_input.get("y", 0)
+            element = tool_input.get("element_name", "")
+            if element:
+                return f"Click on '{element}' at ({x}, {y})"
+            return f"Click at ({x}, {y})"
+
+        elif tool_name == "double_click":
+            x, y = tool_input.get("x", 0), tool_input.get("y", 0)
+            return f"Double-click at ({x}, {y})"
+
+        elif tool_name == "right_click":
+            x, y = tool_input.get("x", 0), tool_input.get("y", 0)
+            return f"Right-click at ({x}, {y})"
+
+        elif tool_name == "type_text":
+            text = tool_input.get("text", "")
+            preview = text[:30] + "..." if len(text) > 30 else text
+            return f"Type: '{preview}'"
+
+        elif tool_name == "hotkey":
+            keys = tool_input.get("keys", [])
+            return f"Hotkey: {'+'.join(keys)}"
+
+        elif tool_name == "scroll":
+            amount = tool_input.get("amount", 0)
+            direction = "up" if amount > 0 else "down"
+            return f"Scroll {direction} by {abs(amount)}"
+
+        elif tool_name == "task_complete":
+            return f"Task complete"
+
+        else:
+            return f"{tool_name}: {tool_input}"
+
+    def get_task_plan(self) -> Optional[TaskPlan]:
+        """Get the current task plan if available."""
+        if self.state:
+            return self.state.task_plan
+        return None

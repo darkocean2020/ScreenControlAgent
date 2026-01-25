@@ -180,3 +180,59 @@ MEMORY_CONTEXT_TEMPLATE = """
 {memory_content}
 === END MEMORY ===
 """
+
+# ============================================================================
+# Reflection Workflow Prompts
+# ============================================================================
+
+REFLECTION_VERIFY_PROMPT = """验证子任务是否已完成。
+
+子任务: {subtask_description}
+成功标准: {success_criteria}
+
+已执行的操作:
+{actions_taken}
+
+相似案例参考:
+{similar_cases}
+
+分析当前屏幕截图，判断子任务是否已完成。
+
+输出 JSON 格式:
+{{
+    "subtask_completed": true或false,
+    "confidence": 0.0-1.0的置信度,
+    "observation": "当前屏幕状态的客观描述",
+    "failure_reason": "如果未完成，说明原因（可选）"
+}}
+"""
+
+REFLECTION_ANALYZE_PROMPT = """子任务执行失败，需要分析原因并提供替代方案。
+
+子任务: {subtask_description}
+成功标准: {success_criteria}
+
+已执行的操作:
+{actions_taken}
+
+尝试次数: {attempt_count}
+上次观察: {previous_observation}
+上次失败原因: {previous_failure}
+
+相似成功案例参考:
+{similar_cases}
+
+请分析:
+1. 失败的根本原因是什么？
+2. 有什么替代方案可以完成这个子任务？
+3. 是否应该重试？
+
+输出 JSON 格式:
+{{
+    "confidence": 0.0-1.0,
+    "observation": "当前屏幕状态分析",
+    "failure_reason": "失败的根本原因",
+    "suggested_approach": "建议的替代方案（具体描述如何操作）",
+    "should_retry": true或false
+}}
+"""
