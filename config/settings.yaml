@@ -2,16 +2,14 @@
 
 # Controller mode settings (LLM-driven architecture)
 controller:
-  mode: "llm_driven"  # "llm_driven" (new) or "vlm_driven" (legacy)
+  mode: "llm_driven"
 
   llm:
-    provider: "claude"
-    model: "claude-sonnet-4-20250514"
+    model: "gpt-5.2"  # OpenAI model
     max_tokens: 4096
 
   vlm_tool:
-    provider: "openai"  # VLM used for look_at_screen tool
-    model: "gpt-4o"
+    model: "gpt-4o"  # VLM for look_at_screen tool
 
 # Agent behavior
 agent:

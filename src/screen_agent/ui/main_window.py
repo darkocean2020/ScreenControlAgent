@@ -11,8 +11,8 @@ from PyQt5.QtWidgets import (
 
 from ..models.action import StepInfo
 from ..utils.config import load_config
-from ..perception.vlm_client import ClaudeVLMClient, OpenAIVLMClient
-from ..brain.llm_controller import LLMController, StepResult
+from ..perception.vlm_client import OpenAIVLMClient
+from ..brain.openai_controller import OpenAILLMController, StepResult
 from .floating_overlay import FloatingOverlay
 from .styles import MAIN_WINDOW_STYLE
 
@@ -65,6 +65,7 @@ class MainWindow(QMainWindow):
         self.controller: Optional[LLMController] = None
         self.agent_thread: Optional[LLMControllerThread] = None
         self.overlay = FloatingOverlay()
+        self.subtitle_label: Optional[QLabel] = None
 
         self._setup_ui()
         self._connect_signals()
@@ -92,11 +93,14 @@ class MainWindow(QMainWindow):
         title.setAlignment(Qt.AlignCenter)
         layout.addWidget(title)
 
-        # Subtitle
-        subtitle = QLabel("LLM-Driven Mode (Claude + GPT-4o)")
-        subtitle.setAlignment(Qt.AlignCenter)
-        subtitle.setStyleSheet("color: #666; font-size: 12px;")
-        layout.addWidget(subtitle)
+        # Subtitle (dynamic based on config)
+        self.subtitle_label = QLabel("LLM-Driven Mode")
+        self.subtitle_label.setAlignment(Qt.AlignCenter)
+        self.subtitle_label.setStyleSheet("color: #666; font-size: 12px;")
+        layout.addWidget(self.subtitle_label)
+
+        # Update subtitle based on config
+        self._update_subtitle()
 
         # Task input (multi-line, resizable)
         task_label = QLabel("Task:")
@@ -150,6 +154,20 @@ class MainWindow(QMainWindow):
         shortcut = QShortcut(QKeySequence("Ctrl+Return"), self)
         shortcut.activated.connect(self._on_start)
 
+    def _update_subtitle(self):
+        """Update subtitle based on current configuration."""
+        try:
+            config = load_config()
+            controller_config = getattr(config, 'controller', None)
+
+            if controller_config and hasattr(controller_config, 'llm'):
+                model = controller_config.llm.get('model', 'gpt-4.5-preview')
+                self.subtitle_label.setText(f"OpenAI Mode ({model})")
+            else:
+                self.subtitle_label.setText("OpenAI Mode (gpt-4.5-preview)")
+        except Exception:
+            self.subtitle_label.setText("OpenAI Mode")
+
     def _on_start(self):
         """Handle start button click."""
         task = self.task_input.toPlainText().strip()
@@ -173,32 +191,27 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Error", f"Failed to start agent:\n{error_msg}")
 
     def _start_controller(self, task: str, config):
-        """Start the LLM controller."""
+        """Start the OpenAI LLM controller."""
         from ..perception.ui_automation import UIAutomationClient
 
-        print(f"[UI] Starting LLM-Driven mode")
+        print(f"[UI] Starting OpenAI LLM mode")
 
-        # Get controller config
-        controller_config = getattr(config, 'controller', None)
-
-        # Determine LLM settings
-        if controller_config and hasattr(controller_config, 'llm'):
-            llm_model = controller_config.llm.get('model', 'claude-sonnet-4-20250514')
-        else:
-            llm_model = 'claude-sonnet-4-20250514'
-
-        # Check API key
-        if not config.anthropic_api_key:
-            QMessageBox.critical(self, "Error", "Anthropic API key not found.")
+        # Check OpenAI API key
+        if not config.openai_api_key:
+            QMessageBox.critical(self, "Error", "OpenAI API key not found. Set OPENAI_API_KEY environment variable.")
             return
+
+        # Get LLM model from config
+        controller_config = getattr(config, 'controller', None)
+        llm_model = "gpt-5.2"
+        if controller_config and hasattr(controller_config, 'llm'):
+            llm_model = controller_config.llm.get('model', 'gpt-4.5-preview')
+
+        print(f"[UI] LLM Model: {llm_model}")
 
         # Create VLM client for look_at_screen tool
         vlm_model = config.vlm.openai_model
-        print(f"[UI] Creating VLM client (OpenAI: {vlm_model})...")
-
-        if not config.openai_api_key:
-            QMessageBox.critical(self, "Error", "OpenAI API key not found.")
-            return
+        print(f"[UI] VLM Model: {vlm_model}")
 
         vlm_client = OpenAIVLMClient(
             api_key=config.openai_api_key,
@@ -216,10 +229,10 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"[UI] Warning: Failed to initialize UIAutomation: {e}")
 
-        # Create LLM controller
-        print(f"[UI] Creating LLM controller with model: {llm_model}")
-        self.controller = LLMController(
-            api_key=config.anthropic_api_key,
+        # Create OpenAI LLM controller
+        print(f"[UI] Creating OpenAI controller with model: {llm_model}")
+        self.controller = OpenAILLMController(
+            api_key=config.openai_api_key,
             model=llm_model,
             vlm_client=vlm_client,
             uia_client=uia_client,
