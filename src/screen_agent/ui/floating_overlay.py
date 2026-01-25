@@ -35,8 +35,9 @@ class FloatingOverlay(QWidget):
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setAttribute(Qt.WA_ShowWithoutActivating)
 
-        # Set fixed width, variable height
-        self.setFixedWidth(320)
+        # Set width range for auto-fit text
+        self.setMinimumWidth(280)
+        self.setMaximumWidth(450)
         self.setMinimumHeight(100)
 
         self._setup_ui()
@@ -78,7 +79,6 @@ class FloatingOverlay(QWidget):
         self.observation_label = QLabel("")
         self.observation_label.setObjectName("contentLabel")
         self.observation_label.setWordWrap(True)
-        self.observation_label.setMaximumHeight(80)
         inner_layout.addWidget(self.observation_label)
 
         # Reasoning section (at bottom)
@@ -89,7 +89,6 @@ class FloatingOverlay(QWidget):
         self.reasoning_label = QLabel("")
         self.reasoning_label.setObjectName("contentLabel")
         self.reasoning_label.setWordWrap(True)
-        self.reasoning_label.setMaximumHeight(80)
         inner_layout.addWidget(self.reasoning_label)
 
         inner_layout.addStretch()
@@ -173,20 +172,23 @@ class FloatingOverlay(QWidget):
         action_text = f"Step {step_info.step_number}: {step_info.action}"
         self.action_label.setText(action_text)
 
-        # Update reasoning
+        # Update reasoning (allow more text)
         reasoning_text = step_info.reasoning or "(No reasoning provided)"
-        if len(reasoning_text) > 200:
-            reasoning_text = reasoning_text[:200] + "..."
+        if len(reasoning_text) > 400:
+            reasoning_text = reasoning_text[:400] + "..."
         self.reasoning_label.setText(reasoning_text)
 
-        # Update observation
+        # Update observation (allow more text)
         observation_text = step_info.observation or "(No observation yet)"
-        if len(observation_text) > 200:
-            observation_text = observation_text[:200] + "..."
+        if len(observation_text) > 400:
+            observation_text = observation_text[:400] + "..."
         self.observation_label.setText(observation_text)
 
-        # Adjust height based on content
+        # Adjust size based on content
         self.adjustSize()
+
+        # Also adjust container
+        self.container.adjustSize()
 
     def show(self):
         """Show the overlay and start following the mouse."""
