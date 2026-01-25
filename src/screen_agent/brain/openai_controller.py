@@ -567,6 +567,12 @@ class OpenAILLMController:
             elif tool_name == "scroll":
                 return self._tool_scroll(tool_input), True, False
 
+            elif tool_name == "find_element":
+                return self._tool_find_element(tool_input), True, False
+
+            elif tool_name == "click_element":
+                return self._tool_click_element(tool_input), True, False
+
             elif tool_name == "task_complete":
                 return self._tool_task_complete(tool_input), True, True
 
@@ -741,6 +747,104 @@ class OpenAILLMController:
         else:
             return f"滚动失败"
 
+    def _tool_find_element(self, input: Dict[str, Any]) -> str:
+        """Execute find_element tool using UIAutomation."""
+        name = input["name"]
+        element_type = input.get("element_type", "Any")
+
+        if not self.uia_client or not self.uia_client.is_available():
+            return f"UIAutomation 不可用，无法查找元素 '{name}'。请使用 look_at_screen 工具估计坐标。"
+
+        try:
+            ui_tree = self.uia_client.get_element_tree()
+            elements = ui_tree.find_by_name(name, partial=True)
+
+            if not elements:
+                return f"未找到名称包含 '{name}' 的元素。请尝试使用不同的名称，或使用 look_at_screen 工具查看屏幕。"
+
+            # Filter by element type if specified
+            if element_type and element_type != "Any":
+                filtered = [e for e in elements if element_type.lower() in e.control_type.lower()]
+                if filtered:
+                    elements = filtered
+
+            # Return the first matching element's info
+            result_lines = [f"找到 {len(elements)} 个匹配元素:"]
+            for i, elem in enumerate(elements[:5]):  # Limit to 5 elements
+                center = elem.center
+                result_lines.append(
+                    f"  {i+1}. '{elem.name}' ({elem.control_type}) - 坐标: ({center[0]}, {center[1]})"
+                )
+
+            if len(elements) > 5:
+                result_lines.append(f"  ... 还有 {len(elements) - 5} 个元素")
+
+            # Recommend the first element
+            best = elements[0]
+            center = best.center
+            result_lines.append(f"\n推荐点击: '{best.name}' at ({center[0]}, {center[1]})")
+
+            return "\n".join(result_lines)
+
+        except Exception as e:
+            logger.error(f"find_element failed: {e}")
+            return f"查找元素失败: {str(e)}"
+
+    def _tool_click_element(self, input: Dict[str, Any]) -> str:
+        """Execute click_element tool - find element by name and click it."""
+        name = input["name"]
+        element_type = input.get("element_type", "Any")
+        click_type = input.get("click_type", "single")
+
+        if not self.uia_client or not self.uia_client.is_available():
+            return f"UIAutomation 不可用，无法点击元素 '{name}'。请使用 find_element 或 look_at_screen 获取坐标后使用 click 工具。"
+
+        try:
+            ui_tree = self.uia_client.get_element_tree()
+            elements = ui_tree.find_by_name(name, partial=True)
+
+            if not elements:
+                return f"未找到名称包含 '{name}' 的元素。请尝试使用不同的名称，或使用 look_at_screen 工具查看屏幕后使用 click 工具。"
+
+            # Filter by element type if specified
+            if element_type and element_type != "Any":
+                filtered = [e for e in elements if element_type.lower() in e.control_type.lower()]
+                if filtered:
+                    elements = filtered
+
+            # Click the first matching element
+            target = elements[0]
+            center = target.center
+            x, y = center[0], center[1]
+
+            # Determine action type
+            if click_type == "double":
+                action_type = ActionType.DOUBLE_CLICK
+                action_desc = "双击"
+            elif click_type == "right":
+                action_type = ActionType.RIGHT_CLICK
+                action_desc = "右键点击"
+            else:
+                action_type = ActionType.CLICK
+                action_desc = "点击"
+
+            action = Action(
+                action_type=action_type,
+                coordinates=(x, y),
+                description=f"{action_desc} '{target.name}'"
+            )
+
+            success = self.executor.execute(action)
+
+            if success:
+                return f"成功{action_desc}元素 '{target.name}' ({target.control_type}) 于坐标 ({x}, {y})"
+            else:
+                return f"{action_desc}元素 '{target.name}' 失败"
+
+        except Exception as e:
+            logger.error(f"click_element failed: {e}")
+            return f"点击元素失败: {str(e)}"
+
     def _tool_task_complete(self, input: Dict[str, Any]) -> str:
         """Execute task_complete tool."""
         summary = input["summary"]
@@ -791,6 +895,15 @@ class OpenAILLMController:
             amount = tool_input.get("amount", 0)
             direction = "up" if amount > 0 else "down"
             return f"Scroll {direction} by {abs(amount)}"
+
+        elif tool_name == "find_element":
+            name = tool_input.get("name", "")
+            return f"Find element: '{name}'"
+
+        elif tool_name == "click_element":
+            name = tool_input.get("name", "")
+            click_type = tool_input.get("click_type", "single")
+            return f"Click element: '{name}' ({click_type})"
 
         elif tool_name == "task_complete":
             return f"Task complete"

@@ -159,9 +159,61 @@ TASK_COMPLETE_TOOL = {
     }
 }
 
+# =============================================================================
+# Grounding Tools (UIAutomation-based precise element interaction)
+# =============================================================================
+
+FIND_ELEMENT_TOOL = {
+    "name": "find_element",
+    "description": "通过名称或文本查找屏幕上的UI元素，返回精确坐标。优先使用此工具获取按钮、输入框等元素的准确位置，而不是从截图估计坐标。",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "name": {
+                "type": "string",
+                "description": "要查找的元素名称或文本，如'保存'、'确定'、'取消'、'文件名'等"
+            },
+            "element_type": {
+                "type": "string",
+                "description": "元素类型过滤（可选），如'Button'、'Edit'、'MenuItem'、'ListItem'等",
+                "enum": ["Button", "Edit", "MenuItem", "ListItem", "CheckBox", "RadioButton", "ComboBox", "Tab", "Link", "Text", "Any"]
+            }
+        },
+        "required": ["name"]
+    }
+}
+
+CLICK_ELEMENT_TOOL = {
+    "name": "click_element",
+    "description": "通过名称直接点击UI元素，无需手动指定坐标。系统会自动查找元素并点击其中心位置。这比手动指定坐标更准确可靠。",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "name": {
+                "type": "string",
+                "description": "要点击的元素名称或文本，如'保存'、'确定'、'取消'等"
+            },
+            "element_type": {
+                "type": "string",
+                "description": "元素类型过滤（可选），如'Button'、'Edit'等",
+                "enum": ["Button", "Edit", "MenuItem", "ListItem", "CheckBox", "RadioButton", "ComboBox", "Tab", "Link", "Text", "Any"]
+            },
+            "click_type": {
+                "type": "string",
+                "description": "点击类型（可选），默认为单击",
+                "enum": ["single", "double", "right"],
+                "default": "single"
+            }
+        },
+        "required": ["name"]
+    }
+}
+
 # All tools list
 ALL_TOOLS: List[Dict[str, Any]] = [
     LOOK_AT_SCREEN_TOOL,
+    FIND_ELEMENT_TOOL,
+    CLICK_ELEMENT_TOOL,
     CLICK_TOOL,
     DOUBLE_CLICK_TOOL,
     RIGHT_CLICK_TOOL,
