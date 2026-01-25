@@ -10,7 +10,7 @@ controller:
 
 # Agent behavior
 agent:
-  max_steps: 40
+  max_steps: 0  # 0 = unlimited steps
   action_delay: 0.5
   verify_each_step: true
   timeout: 300
