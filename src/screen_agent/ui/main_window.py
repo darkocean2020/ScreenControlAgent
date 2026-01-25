@@ -3,9 +3,10 @@
 from typing import Optional
 
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
+from PyQt5.QtGui import QKeySequence
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QLineEdit, QPushButton, QLabel, QMessageBox
+    QTextEdit, QPushButton, QLabel, QMessageBox, QSizePolicy, QShortcut
 )
 
 from ..models.action import StepInfo
@@ -71,7 +72,8 @@ class MainWindow(QMainWindow):
     def _setup_ui(self):
         """Set up the main window UI."""
         self.setWindowTitle("ScreenControlAgent")
-        self.setFixedSize(500, 200)
+        self.setMinimumSize(500, 250)
+        self.resize(600, 300)
         self.setStyleSheet(MAIN_WINDOW_STYLE)
 
         # Central widget
@@ -96,16 +98,16 @@ class MainWindow(QMainWindow):
         subtitle.setStyleSheet("color: #666; font-size: 12px;")
         layout.addWidget(subtitle)
 
-        # Task input row
-        input_layout = QHBoxLayout()
-        input_layout.setSpacing(10)
+        # Task input (multi-line, resizable)
+        task_label = QLabel("Task:")
+        layout.addWidget(task_label)
 
-        self.task_input = QLineEdit()
+        self.task_input = QTextEdit()
         self.task_input.setPlaceholderText("Enter task, e.g.: Open Notepad and type Hello World")
-        self.task_input.returnPressed.connect(self._on_start)
-        input_layout.addWidget(self.task_input, stretch=1)
-
-        layout.addLayout(input_layout)
+        self.task_input.setMinimumHeight(60)
+        self.task_input.setMaximumHeight(150)
+        self.task_input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        layout.addWidget(self.task_input, stretch=1)
 
         # Buttons row
         button_layout = QHBoxLayout()
@@ -130,16 +132,13 @@ class MainWindow(QMainWindow):
 
         self.status_label = QLabel("Status: Idle")
         self.status_label.setObjectName("statusLabel")
-        status_layout.addWidget(self.status_label)
-
-        status_layout.addStretch()
+        self.status_label.setWordWrap(True)
+        status_layout.addWidget(self.status_label, stretch=1)
 
         self.progress_label = QLabel("")
         status_layout.addWidget(self.progress_label)
 
         layout.addLayout(status_layout)
-
-        layout.addStretch()
 
     def _connect_signals(self):
         """Connect button signals."""
@@ -147,9 +146,13 @@ class MainWindow(QMainWindow):
         self.stop_btn.clicked.connect(self._on_stop)
         self.update_overlay_signal.connect(self._update_overlay)
 
+        # Ctrl+Enter to start task
+        shortcut = QShortcut(QKeySequence("Ctrl+Return"), self)
+        shortcut.activated.connect(self._on_start)
+
     def _on_start(self):
         """Handle start button click."""
-        task = self.task_input.text().strip()
+        task = self.task_input.toPlainText().strip()
         if not task:
             QMessageBox.warning(self, "Warning", "Please enter a task description.")
             return

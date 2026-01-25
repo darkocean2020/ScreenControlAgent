@@ -9,7 +9,7 @@ QWidget#centralWidget {
     background-color: #1e1e1e;
 }
 
-QLineEdit {
+QLineEdit, QTextEdit {
     padding: 10px;
     border: 2px solid #3c3c3c;
     border-radius: 6px;
@@ -19,7 +19,7 @@ QLineEdit {
     selection-background-color: #4CAF50;
 }
 
-QLineEdit:focus {
+QLineEdit:focus, QTextEdit:focus {
     border-color: #4CAF50;
 }
 
