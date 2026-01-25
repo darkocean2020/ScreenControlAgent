@@ -7,9 +7,10 @@
 ## 特性
 
 - **自然语言控制** - 用自然语言描述任务，代理自动执行
-- **LLM 驱动架构** - Claude 作为大脑决策，GPT-4o 作为视觉工具
+- **OpenAI 驱动架构** - GPT-5.2/GPT-4o 作为大脑决策和视觉工具
 - **多模态感知** - 视觉（VLM）+ 结构化信息（Accessibility Tree）融合
 - **智能规划** - 支持复杂任务分解、多步规划
+- **子任务反思** - 每个子任务完成后验证，失败自动重试
 - **记忆系统** - 短期 + 长期记忆，从历史经验中学习
 - **错误恢复** - 自动检测异常状态并尝试恢复
 
@@ -21,9 +22,9 @@
 └─────────────────────────────┬────────────────────────────────┘
                               ↓
 ┌──────────────────────────────────────────────────────────────┐
-│              大脑层 (Brain Layer - Claude LLM)                │
+│              大脑层 (Brain Layer - OpenAI LLM)               │
 │                                                              │
-│  LLM 通过 tool_use 调用以下工具:                              │
+│  LLM 通过 function calling 调用以下工具:                      │
 │  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────────┐ │
 │  │look_at_screen│ │ click/type │ │ hotkey/scroll/wait     │ │
 │  │   (VLM)     │ │             │ │                        │ │
@@ -53,7 +54,7 @@
 
 - Python 3.10+
 - Windows 10/11（当前仅支持 Windows）
-- API 密钥：Anthropic（LLM）和 OpenAI（VLM）
+- API 密钥：OpenAI
 
 ### 安装步骤
 
@@ -80,11 +81,16 @@ pip install PyQt5>=5.15.0
 copy .env.example .env
 
 # 编辑 .env 文件，填入你的 API 密钥
-# ANTHROPIC_API_KEY=sk-ant-your-key-here
 # OPENAI_API_KEY=sk-your-key-here
 ```
 
 ## 快速开始
+
+### GUI 模式（推荐）
+
+```bash
+python run_ui.py
+```
 
 ### 命令行模式
 
@@ -102,16 +108,10 @@ python -m screen_agent.main --verbose "打开浏览器"
 python -m screen_agent.main --max-steps 30 "完成复杂任务"
 ```
 
-### GUI 模式
-
-```bash
-python run_ui.py
-```
-
 ### Python API
 
 ```python
-from screen_agent.brain.llm_controller import LLMController
+from screen_agent.brain.openai_controller import OpenAILLMController
 from screen_agent.perception.vlm_client import OpenAIVLMClient
 from screen_agent.perception.ui_automation import UIAutomationClient
 from screen_agent.utils.config import load_config
@@ -128,10 +128,10 @@ vlm_client = OpenAIVLMClient(
 # 创建 UIAutomation 客户端 (可选但推荐)
 uia_client = UIAutomationClient()
 
-# 创建 LLM 控制器
-controller = LLMController(
-    api_key=config.anthropic_api_key,
-    model="claude-sonnet-4-20250514",
+# 创建 OpenAI LLM 控制器
+controller = OpenAILLMController(
+    api_key=config.openai_api_key,
+    model="gpt-5.2",  # 或 gpt-4o
     vlm_client=vlm_client,
     uia_client=uia_client
 )
@@ -139,6 +139,24 @@ controller = LLMController(
 # 执行任务
 success = controller.run("打开记事本并输入 Hello World")
 print("成功" if success else "失败")
+```
+
+## 配置
+
+配置文件位于 `config/settings.yaml`:
+
+```yaml
+controller:
+  llm:
+    model: "gpt-5.2"  # OpenAI 模型: gpt-4o, gpt-5.2, o1 等
+    max_tokens: 4096
+
+  vlm_tool:
+    model: "gpt-4o"  # VLM 用于 look_at_screen 工具
+
+agent:
+  max_steps: 40
+  action_delay: 0.5
 ```
 
 ## 命令行参数
@@ -157,10 +175,10 @@ print("成功" if success else "失败")
 src/screen_agent/
 ├── main.py               # CLI 入口
 ├── brain/                # 大脑层
-│   ├── llm_controller.py # LLM 驱动控制器（核心）
-│   ├── verifier.py       # 动作验证器
+│   ├── openai_controller.py # OpenAI LLM 控制器（主要）
+│   ├── llm_controller.py # Claude LLM 控制器（备用）
 │   ├── task_planner.py   # 复杂任务分解
-│   ├── error_recovery.py # 错误恢复
+│   ├── reflection.py     # 子任务反思验证
 │   ├── tools.py          # LLM 工具定义
 │   └── prompts.py        # 提示词模板
 ├── perception/           # 感知层
@@ -181,11 +199,13 @@ src/screen_agent/
 
 ## 工作原理
 
-1. **LLM 作为大脑** - Claude 使用 tool_use 功能决定下一步操作
-2. **VLM 作为眼睛** - GPT-4o 通过 `look_at_screen` 工具分析屏幕
-3. **UIAutomation 提供精确坐标** - Windows Accessibility Tree 获取 UI 元素位置
-4. **执行动作** - pyautogui 控制鼠标和键盘
-5. **循环直到完成** - LLM 判断任务是否完成，调用 `task_complete` 结束
+1. **任务分解** - 复杂任务自动分解为多个子任务
+2. **LLM 作为大脑** - OpenAI GPT 使用 function calling 决定下一步操作
+3. **VLM 作为眼睛** - GPT-4o 通过 `look_at_screen` 工具分析屏幕
+4. **UIAutomation 提供精确坐标** - Windows Accessibility Tree 获取 UI 元素位置
+5. **执行动作** - pyautogui 控制鼠标和键盘
+6. **子任务验证** - 每个子任务完成后验证结果，失败则反思并重试
+7. **循环直到完成** - LLM 判断任务是否完成，调用 `task_complete` 结束
 
 ## 可用工具
 
@@ -204,7 +224,7 @@ src/screen_agent/
 
 | 组件 | 技术 |
 |------|------|
-| LLM (大脑) | Claude Sonnet (tool_use) |
+| LLM (大脑) | OpenAI GPT-5.2 / GPT-4o (function calling) |
 | VLM (视觉) | GPT-4o |
 | 屏幕捕获 | mss |
 | UI 自动化 | Windows UIAutomation |
