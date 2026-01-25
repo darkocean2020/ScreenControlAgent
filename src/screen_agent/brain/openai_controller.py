@@ -39,6 +39,19 @@ except ImportError:
 logger = get_logger(__name__)
 
 
+def safe_str(msg: str) -> str:
+    """Convert string to ASCII-safe version for logging/printing on Windows."""
+    return msg.encode('ascii', errors='replace').decode('ascii')
+
+
+def safe_print(msg: str) -> None:
+    """Print message with fallback for encoding errors (e.g., emoji on Windows GBK)."""
+    try:
+        print(msg)
+    except UnicodeEncodeError:
+        print(safe_str(msg))
+
+
 @dataclass
 class ControllerState:
     """State of the LLM controller."""
@@ -471,7 +484,7 @@ class OpenAILLMController:
     def _call_llm(self):
         """Call the OpenAI LLM with current messages and tools."""
         try:
-            print(f"[OpenAI] Calling {self.model}...")
+            safe_print(f"[OpenAI] Calling {self.model}...")
 
             # Build system prompt with RAG context
             system_prompt = CONTROLLER_SYSTEM_PROMPT
@@ -501,7 +514,7 @@ class OpenAILLMController:
             return response
         except Exception as e:
             logger.error(f"OpenAI LLM call failed: {e}")
-            print(f"[OpenAI] ERROR: {e}")
+            safe_print(f"[OpenAI] ERROR: {e}")
             return None
 
     def _process_response(self, response) -> bool:
@@ -522,8 +535,8 @@ class OpenAILLMController:
                 except:
                     tool_input = {}
 
-                logger.info(f"Executing tool: {tool_name} with input: {tool_input}")
-                print(f"[OpenAI] Tool: {tool_name}, Input: {tool_input}")
+                logger.info(f"Executing tool: {tool_name} with input: {safe_str(str(tool_input))}")
+                safe_print(f"[OpenAI] Tool: {tool_name}, Input: {tool_input}")
 
                 # Execute tool
                 result, success, is_complete = self._execute_tool(tool_name, tool_input)

@@ -16,6 +16,16 @@ from .floating_overlay import FloatingOverlay
 from .styles import MAIN_WINDOW_STYLE
 
 
+def safe_print(msg: str) -> None:
+    """Print message with fallback for encoding errors (e.g., emoji on Windows GBK)."""
+    try:
+        print(msg)
+    except UnicodeEncodeError:
+        # Replace non-ASCII characters with '?' for console output
+        safe_msg = msg.encode('ascii', errors='replace').decode('ascii')
+        print(safe_msg)
+
+
 class LLMControllerThread(QThread):
     """Background thread for running the LLM controller."""
 
@@ -33,14 +43,14 @@ class LLMControllerThread(QThread):
     def run(self):
         """Run the LLM controller task."""
         try:
-            print(f"[LLMThread] Starting controller.run()")
+            safe_print(f"[LLMThread] Starting controller.run()")
             success = self.controller.run(self.task, max_steps=self.max_steps)
-            print(f"[LLMThread] Controller finished, success={success}")
+            safe_print(f"[LLMThread] Controller finished, success={success}")
             self.finished.emit(success)
         except Exception as e:
             import traceback
             error_msg = str(e) if str(e) else "Unknown thread error"
-            print(f"[LLMThread] Error: {error_msg}")
+            safe_print(f"[LLMThread] Error: {error_msg}")
             traceback.print_exc()
             self.error_occurred.emit(error_msg)
             self.finished.emit(False)
@@ -176,16 +186,16 @@ class MainWindow(QMainWindow):
 
         try:
             # Load config
-            print(f"[UI] Starting task: {task}")
+            safe_print(f"[UI] Starting task: {task}")
             config = load_config()
-            print(f"[UI] Config loaded")
+            safe_print(f"[UI] Config loaded")
 
             self._start_controller(task, config)
 
         except Exception as e:
             import traceback
             error_msg = str(e) if str(e) else "Unknown error"
-            print(f"[UI] Error: {error_msg}")
+            safe_print(f"[UI] Error: {error_msg}")
             traceback.print_exc()
             QMessageBox.critical(self, "Error", f"Failed to start agent:\n{error_msg}")
 
@@ -193,7 +203,7 @@ class MainWindow(QMainWindow):
         """Start the OpenAI unified VLM brain controller."""
         from ..perception.ui_automation import UIAutomationClient
 
-        print(f"[UI] Starting unified VLM brain mode")
+        safe_print(f"[UI] Starting unified VLM brain mode")
 
         # Check OpenAI API key
         if not config.openai_api_key:
@@ -206,7 +216,7 @@ class MainWindow(QMainWindow):
         if controller_config and hasattr(controller_config, 'llm'):
             model = controller_config.llm.get('model', 'gpt-5.2')
 
-        print(f"[UI] VLM Brain Model: {model}")
+        safe_print(f"[UI] VLM Brain Model: {model}")
 
         # Create UIAutomation client
         uia_client = None
@@ -215,12 +225,12 @@ class MainWindow(QMainWindow):
                 max_depth=getattr(config.grounding, 'uia_max_depth', 15),
                 cache_duration=getattr(config.grounding, 'uia_cache_duration', 0.5)
             )
-            print(f"[UI] UIAutomation client created")
+            safe_print(f"[UI] UIAutomation client created")
         except Exception as e:
-            print(f"[UI] Warning: Failed to initialize UIAutomation: {e}")
+            safe_print(f"[UI] Warning: Failed to initialize UIAutomation: {e}")
 
         # Create unified VLM brain controller (no separate VLM client needed)
-        print(f"[UI] Creating unified VLM brain: {model}")
+        safe_print(f"[UI] Creating unified VLM brain: {model}")
         self.controller = OpenAILLMController(
             api_key=config.openai_api_key,
             model=model,
@@ -256,12 +266,12 @@ class MainWindow(QMainWindow):
     def _on_step(self, step_result: StepResult):
         """Callback from LLM controller when a tool is executed."""
         try:
-            print(f"[Callback] Tool: {step_result.tool_name}")
+            safe_print(f"[Callback] Tool: {step_result.tool_name}")
             result_preview = step_result.tool_result[:100] if step_result.tool_result else 'None'
-            print(f"[Callback] Result: {result_preview}...")
+            safe_print(f"[Callback] Result: {result_preview}...")
         except UnicodeEncodeError:
             # Handle encoding issues on Windows consoles
-            print(f"[Callback] Tool: {step_result.tool_name}")
+            safe_print(f"[Callback] Tool: {step_result.tool_name}")
             print("[Callback] Result: (contains non-printable characters)...")
 
         # Convert to StepInfo-like object for overlay
@@ -289,7 +299,7 @@ class MainWindow(QMainWindow):
 
     def _update_overlay(self, step_info: StepInfo):
         """Update overlay in the main thread."""
-        print(f"[UI Update] Updating overlay for step {step_info.step_number}")
+        safe_print(f"[UI Update] Updating overlay for step {step_info.step_number}")
         self.overlay.update_info(step_info)
         self.progress_label.setText(f"Step {step_info.step_number}")
 
@@ -310,7 +320,7 @@ class MainWindow(QMainWindow):
 
     def _on_error(self, error_msg: str):
         """Handle error from agent thread."""
-        print(f"[UI] Received error signal: {error_msg}")
+        safe_print(f"[UI] Received error signal: {error_msg}")
         self.overlay.hide()
         self.showNormal()  # Restore main window
         self.status_label.setText("Status: Error")
