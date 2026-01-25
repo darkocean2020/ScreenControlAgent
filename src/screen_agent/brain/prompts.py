@@ -11,9 +11,9 @@ CONTROLLER_SYSTEM_PROMPT = """你是一个屏幕控制代理，通过工具来�
 ### 感知工具
 - look_at_screen: 查看当前屏幕状态。返回屏幕描述和可见元素列表（包含坐标）。这是你的"眼睛"。
 
-### 精确定位工具（推荐优先使用）
-- find_element(name): 通过名称查找 UI 元素，返回精确坐标。比从截图估计坐标更准确！
-- click_element(name): 直接通过名称点击元素，无需手动指定坐标。**点击按钮、输入框等标准 UI 元素时，优先使用此工具！**
+### 精确定位工具（点击前必须使用）
+- find_element(name): 通过名称查找 UI 元素，返回精确坐标。**点击前必须先调用此工具确认元素存在！**
+- click_element(name): 通过名称点击元素。**必须在 find_element 确认元素存在后才能调用！**
 
 ### 操作工具
 - click(x, y): 在指定坐标点击鼠标左键（当 click_element 不可用时使用）
@@ -29,14 +29,15 @@ CONTROLLER_SYSTEM_PROMPT = """你是一个屏幕控制代理，通过工具来�
 ## 工作流程
 
 1. 首先调用 look_at_screen 了解屏幕状态
-2. 需要点击 UI 元素时，**优先使用 click_element(name) 通过名称直接点击**
-3. 如果 click_element 找不到元素，再使用 find_element(name) 获取坐标，然后用 click(x, y)
-4. 执行操作后，再次调用 look_at_screen 确认结果
-5. 重复直到任务完成，然后调用 task_complete
+2. 需要点击 UI 元素时，**必须先调用 find_element(name) 确认元素存在并获取坐标**
+3. 确认元素存在后，再调用 click_element(name) 点击该元素
+4. 如果 find_element 找不到元素，使用 look_at_screen 查看屏幕后用 click(x, y) 估计坐标
+5. 执行操作后，再次调用 look_at_screen 确认结果
+6. 重复直到任务完成，然后调用 task_complete
 
 ## 重要提示
 
-- **点击准确性**：click_element > find_element + click > 从截图估计坐标的 click
+- **点击流程**：find_element 确认存在 → click_element 点击（必须先 find 再 click）
 - 坐标从屏幕左上角 (0,0) 开始，X 向右增加，Y 向下增加
 - Windows 搜索结果通常不可点击，请用 hotkey(["enter"]) 选择第一个结果
 - 不确定时多看几次屏幕
@@ -64,8 +65,8 @@ CONTROLLER_SYSTEM_PROMPT = """你是一个屏幕控制代理，通过工具来�
 5. 保存: hotkey(["ctrl", "s"])
 6. 新建文件: hotkey(["ctrl", "n"])
 7. 最小化当前窗口: hotkey(["win", "down"]) 或点击窗口标题栏的最小化按钮
-8. 点击按钮（推荐）: click_element("保存") 或 click_element("确定")
-9. 查找元素坐标: find_element("取消") → 获取坐标后 click(x, y)
+8. 点击按钮（标准流程）: find_element("保存") → 确认存在 → click_element("保存")
+9. 元素不存在时的备选: look_at_screen → 从截图估计坐标 → click(x, y)
 """
 
 LOOK_AT_SCREEN_PROMPT = """分析这个屏幕截图，描述当前屏幕状态。
