@@ -38,6 +38,7 @@ CONTROLLER_SYSTEM_PROMPT = """你是一个屏幕控制代理，通过工具来�
 - 每次只执行一个操作，观察结果后再继续
 - 如果操作失败，尝试其他方法
 - 使用 look_at_screen 返回的 UI 元素列表中的坐标，这些坐标更精确
+- **禁止关闭任何窗口**：不要使用 Alt+F4 或点击关闭按钮关闭窗口。如需隐藏窗口，使用最小化操作
 
 ## 常用操作示例
 
@@ -46,7 +47,7 @@ CONTROLLER_SYSTEM_PROMPT = """你是一个屏幕控制代理，通过工具来�
 3. 复制: hotkey(["ctrl", "c"])
 4. 粘贴: hotkey(["ctrl", "v"])
 5. 保存: hotkey(["ctrl", "s"])
-6. 关闭窗口: hotkey(["alt", "f4"])
+6. 最小化当前窗口: hotkey(["win", "down"]) 或点击窗口标题栏的最小化按钮
 """
 
 LOOK_AT_SCREEN_PROMPT = """分析这个屏幕截图，描述当前屏幕状态。
@@ -145,7 +146,8 @@ IMPORTANT:
 - Use the UI element list for PRECISE coordinates when available
 - Match element names from perception data to the element list
 - For Windows search results, use hotkey ["enter"] instead of clicking
-- Only output ONE action at a time"""
+- Only output ONE action at a time
+- **NEVER close any windows**: Do not use Alt+F4 or click close buttons. Use minimize if needed"""
 
 REASONING_USER_PROMPT = """Task: {task}
 
@@ -214,6 +216,7 @@ IMPORTANT GUIDELINES:
 - IMPORTANT: After typing in Windows Start menu search, use hotkey ["enter"] to select the first result instead of clicking (search results are hard to click accurately)
 - If you see the task is completed, output action type "done"
 - Only output ONE action at a time
+- **NEVER close any windows**: Do not use Alt+F4 or click close buttons. Use minimize (hotkey ["win", "down"]) if you need to hide a window
 
 COORDINATE TIPS:
 - Screen origin (0, 0) is at the top-left corner
@@ -290,7 +293,11 @@ ELEMENT DESCRIPTION GUIDELINES:
 SEARCH RESULTS HANDLING:
 - Windows Start menu search results CANNOT be reliably clicked (they don't appear in the element list)
 - After typing in Windows search, use hotkey ["enter"] to select the first/best result
-- Only click on search results if they appear in the UI ELEMENTS list above"""
+- Only click on search results if they appear in the UI ELEMENTS list above
+
+WINDOW MANAGEMENT:
+- **NEVER close any windows**: Do not use Alt+F4 or click close buttons
+- If you need to hide a window, use minimize: hotkey ["win", "down"] or click the minimize button"""
 
 GROUNDED_PLANNING_USER_PROMPT = """Task: {task}
 
