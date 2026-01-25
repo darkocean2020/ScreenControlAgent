@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 @dataclass
 class AgentConfig:
     """Agent behavior configuration."""
-    max_steps: int = 20
+    max_steps: int = 0  # 0 = unlimited
     action_delay: float = 0.5
     verify_each_step: bool = True
     timeout: int = 300

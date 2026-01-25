@@ -24,7 +24,7 @@ class LLMControllerThread(QThread):
     step_completed = pyqtSignal(object)  # Emits StepResult
     error_occurred = pyqtSignal(str)  # Emits error message
 
-    def __init__(self, controller: LLMController, task: str, max_steps: int = 40):
+    def __init__(self, controller: LLMController, task: str, max_steps: int = 0):
         super().__init__()
         self.controller = controller
         self.task = task

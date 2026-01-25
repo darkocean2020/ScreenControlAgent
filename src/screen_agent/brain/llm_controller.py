@@ -97,17 +97,20 @@ class LLMController:
 
         logger.info(f"LLMController initialized with model: {model}")
 
-    def run(self, task: str, max_steps: int = 40) -> bool:
+    def run(self, task: str, max_steps: int = 0) -> bool:
         """
         Execute a task using the LLM controller.
 
         Args:
             task: Natural language task description
-            max_steps: Maximum number of steps (tool calls)
+            max_steps: Maximum number of steps (0 = unlimited)
 
         Returns:
             True if task completed successfully, False otherwise
         """
+        # 0 means unlimited
+        if max_steps <= 0:
+            max_steps = 999999
         logger.info(f"Starting task: {task}")
 
         # Initialize state

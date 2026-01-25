@@ -131,8 +131,8 @@ Examples:
     parser.add_argument(
         "--max-steps",
         type=int,
-        default=40,
-        help="Maximum steps (default: 40)"
+        default=0,
+        help="Maximum steps (0 = unlimited, default: unlimited)"
     )
 
     args = parser.parse_args()
