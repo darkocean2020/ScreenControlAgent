@@ -1,15 +1,12 @@
 # ScreenControlAgent Configuration
 
-# Controller mode settings (LLM-driven architecture)
+# Controller mode settings (Unified VLM Brain)
 controller:
-  mode: "llm_driven"
+  mode: "vlm_brain"
 
   llm:
-    model: "gpt-5.2"  # OpenAI model
+    model: "gpt-5.2"  # Unified VLM brain model (handles both reasoning and vision)
     max_tokens: 4096
-
-  vlm_tool:
-    model: "gpt-4o"  # VLM for look_at_screen tool
 
 # Agent behavior
 agent:

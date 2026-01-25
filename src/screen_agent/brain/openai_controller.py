@@ -578,7 +578,10 @@ class OpenAILLMController:
             return f"Error executing {tool_name}: {str(e)}", False, False
 
     def _tool_look_at_screen(self, input: Dict[str, Any]) -> str:
-        """Execute look_at_screen tool."""
+        """Execute look_at_screen tool using the main LLM as VLM."""
+        import base64
+        from io import BytesIO
+
         screenshot = self.screen_capture.capture()
         screen_size = screenshot.size
 
@@ -599,19 +602,35 @@ class OpenAILLMController:
             element_context=element_context if element_context else "无法获取 UI 元素列表"
         )
 
-        if self.vlm_client:
-            try:
-                result = self.vlm_client.analyze_screen(
-                    screenshot=screenshot,
-                    prompt=prompt,
-                    system_prompt="你是一个视觉观察助手，客观准确地描述屏幕内容。"
-                )
-                return result
-            except Exception as e:
-                logger.error(f"VLM analysis failed: {e}")
-                return f"VLM 分析失败: {str(e)}\n\nUI 元素列表:\n{element_context}"
-        else:
-            return f"屏幕分辨率: {screen_size[0]}x{screen_size[1]}\n\nUI 元素列表:\n{element_context}"
+        # Use the main LLM (GPT-5.2) as VLM to analyze the screenshot
+        try:
+            # Convert screenshot to base64
+            buffer = BytesIO()
+            screenshot.save(buffer, format="PNG")
+            image_b64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
+
+            # Call LLM with image
+            response = self.client.chat.completions.create(
+                model=self.model,
+                max_completion_tokens=1024,
+                messages=[
+                    {"role": "system", "content": "你是一个视觉观察助手，客观准确地描述屏幕内容。"},
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "image_url",
+                                "image_url": {"url": f"data:image/png;base64,{image_b64}"}
+                            },
+                            {"type": "text", "text": prompt}
+                        ]
+                    }
+                ]
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            logger.error(f"VLM analysis failed: {e}")
+            return f"VLM 分析失败: {str(e)}\n\nUI 元素列表:\n{element_context}"
 
     def _tool_click(self, input: Dict[str, Any]) -> str:
         """Execute click tool."""

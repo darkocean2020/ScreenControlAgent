@@ -11,7 +11,6 @@ from PyQt5.QtWidgets import (
 
 from ..models.action import StepInfo
 from ..utils.config import load_config
-from ..perception.vlm_client import OpenAIVLMClient
 from ..brain.openai_controller import OpenAILLMController, StepResult
 from .floating_overlay import FloatingOverlay
 from .styles import MAIN_WINDOW_STYLE
@@ -161,12 +160,12 @@ class MainWindow(QMainWindow):
             controller_config = getattr(config, 'controller', None)
 
             if controller_config and hasattr(controller_config, 'llm'):
-                model = controller_config.llm.get('model', 'gpt-4.5-preview')
-                self.subtitle_label.setText(f"OpenAI Mode ({model})")
+                model = controller_config.llm.get('model', 'gpt-5.2')
+                self.subtitle_label.setText(f"Unified VLM Brain ({model})")
             else:
-                self.subtitle_label.setText("OpenAI Mode (gpt-4.5-preview)")
+                self.subtitle_label.setText("Unified VLM Brain (gpt-5.2)")
         except Exception:
-            self.subtitle_label.setText("OpenAI Mode")
+            self.subtitle_label.setText("Unified VLM Brain")
 
     def _on_start(self):
         """Handle start button click."""
@@ -191,32 +190,23 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Error", f"Failed to start agent:\n{error_msg}")
 
     def _start_controller(self, task: str, config):
-        """Start the OpenAI LLM controller."""
+        """Start the OpenAI unified VLM brain controller."""
         from ..perception.ui_automation import UIAutomationClient
 
-        print(f"[UI] Starting OpenAI LLM mode")
+        print(f"[UI] Starting unified VLM brain mode")
 
         # Check OpenAI API key
         if not config.openai_api_key:
             QMessageBox.critical(self, "Error", "OpenAI API key not found. Set OPENAI_API_KEY environment variable.")
             return
 
-        # Get LLM model from config
+        # Get model from config
         controller_config = getattr(config, 'controller', None)
-        llm_model = "gpt-5.2"
+        model = "gpt-5.2"
         if controller_config and hasattr(controller_config, 'llm'):
-            llm_model = controller_config.llm.get('model', 'gpt-4.5-preview')
+            model = controller_config.llm.get('model', 'gpt-5.2')
 
-        print(f"[UI] LLM Model: {llm_model}")
-
-        # Create VLM client for look_at_screen tool
-        vlm_model = config.vlm.openai_model
-        print(f"[UI] VLM Model: {vlm_model}")
-
-        vlm_client = OpenAIVLMClient(
-            api_key=config.openai_api_key,
-            model=vlm_model
-        )
+        print(f"[UI] VLM Brain Model: {model}")
 
         # Create UIAutomation client
         uia_client = None
@@ -229,12 +219,12 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"[UI] Warning: Failed to initialize UIAutomation: {e}")
 
-        # Create OpenAI LLM controller
-        print(f"[UI] Creating OpenAI controller with model: {llm_model}")
+        # Create unified VLM brain controller (no separate VLM client needed)
+        print(f"[UI] Creating unified VLM brain: {model}")
         self.controller = OpenAILLMController(
             api_key=config.openai_api_key,
-            model=llm_model,
-            vlm_client=vlm_client,
+            model=model,
+            vlm_client=None,
             uia_client=uia_client,
             max_tokens=4096,
             monitor_index=config.screen.monitor_index,
