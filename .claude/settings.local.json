@@ -10,7 +10,8 @@
       "Bash(do echo \"=== $f ===\")",
       "Bash(done)",
       "Bash(start /min cmd /c \"python -m src.screen_agent.main \"\"打开记事本\"\" --verbose > test_output.log 2>&1\")",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(timeout:*)"
     ]
   }
 }

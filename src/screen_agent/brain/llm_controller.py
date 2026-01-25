@@ -263,8 +263,17 @@ class LLMController:
         for attempt in range(max_retries + 1):
             logger.info(f"Subtask attempt {attempt + 1}/{max_retries + 1}")
 
-            # Execute the subtask
+            # Execute the subtask (must have actions taken)
+            actions_before = len(self.state.subtask_actions)
             self._execute_subtask_actions(subtask, max_steps)
+            actions_after = len(self.state.subtask_actions)
+
+            # Check if any actions were actually taken
+            if actions_after == actions_before and attempt > 0:
+                logger.warning("No new actions taken in retry, continuing to next attempt")
+                # Force a new execution by resetting conversation context
+                self._reset_subtask_context(subtask)
+                continue
 
             # Verify with reflection
             if self.reflection:
@@ -297,7 +306,7 @@ class LLMController:
                         # Inject alternative approach hint
                         self._inject_reflection_hint(reflection_result)
 
-                    # Clear actions for retry
+                    # Clear actions for retry but keep reflection hint in messages
                     self.state.subtask_actions.clear()
                     continue
                 else:
@@ -312,6 +321,28 @@ class LLMController:
 
         return False
 
+    def _reset_subtask_context(self, subtask: Subtask) -> None:
+        """
+        Reset conversation context for a fresh subtask retry.
+
+        Args:
+            subtask: The subtask being retried
+        """
+        # Keep only the last few messages for context, then add fresh prompt
+        if len(self.state.messages) > 4:
+            self.state.messages = self.state.messages[-2:]
+
+        retry_prompt = (
+            f"请重新尝试完成子任务: {subtask.description}\n"
+            f"成功标准: {subtask.success_criteria}\n\n"
+            f"首先使用 look_at_screen 查看当前屏幕状态，然后执行必要的操作。"
+        )
+
+        self.state.messages.append({
+            "role": "user",
+            "content": retry_prompt
+        })
+
     def _execute_subtask_actions(self, subtask: Subtask, max_steps: int) -> None:
         """
         Execute actions for a subtask until completion or step limit.
@@ -324,7 +355,8 @@ class LLMController:
         subtask_prompt = (
             f"当前子任务: {subtask.description}\n"
             f"成功标准: {subtask.success_criteria}\n\n"
-            f"请完成这个子任务。首先使用 look_at_screen 工具查看当前屏幕状态。"
+            f"请完成这个子任务。首先使用 look_at_screen 工具查看当前屏幕状态。\n"
+            f"注意: 完成这个子任务后，不要调用 task_complete，系统会自动验证并进入下一个子任务。"
         )
 
         # If we have previous context, include it
@@ -339,12 +371,18 @@ class LLMController:
                 "content": f"总任务: {self.state.task}\n\n{subtask_prompt}"
             }]
 
+        # Track if this subtask called task_complete (should be treated as subtask done)
+        subtask_done = False
+
         # Execute until subtask seems complete or limits reached
         subtask_steps = 0
         max_subtask_steps = min(20, max_steps - self.state.step_count)
 
         while subtask_steps < max_subtask_steps:
-            if self.state.is_completed:
+            # In subtask mode, is_completed means subtask is done, not whole task
+            if subtask_done:
+                # Reset for next subtask
+                self.state.is_completed = False
                 break
 
             response = self._call_llm()
@@ -354,6 +392,11 @@ class LLMController:
             should_continue = self._process_response(response)
             subtask_steps += 1
             self.state.step_count += 1
+
+            # Check if task_complete was called (means subtask is done)
+            if self.state.is_completed:
+                subtask_done = True
+                continue
 
             if not should_continue:
                 break
