@@ -198,7 +198,6 @@ src/screen_agent/
 | `type_text(text)` | 输入文本 |
 | `hotkey(keys)` | 按快捷键，如 `["ctrl", "c"]` |
 | `scroll(amount)` | 滚动，正数向上，负数向下 |
-| `wait(seconds)` | 等待指定秒数 |
 | `task_complete(summary)` | 任务完成 |
 
 ## 技术栈

@@ -18,7 +18,6 @@ CONTROLLER_SYSTEM_PROMPT = """你是一个屏幕控制代理，通过工具来�
 - type_text(text): 输入文本（支持中文）
 - hotkey(keys): 按快捷键，如 ["ctrl", "c"]、["win"]、["enter"]
 - scroll(amount): 滚动，正数向上，负数向下
-- wait(seconds): 等待指定秒数
 
 ### 完成工具
 - task_complete(summary): 任务完成时调用，附带完成摘要

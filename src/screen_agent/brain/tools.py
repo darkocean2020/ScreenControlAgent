@@ -144,21 +144,6 @@ SCROLL_TOOL = {
     }
 }
 
-WAIT_TOOL = {
-    "name": "wait",
-    "description": "等待指定的秒数。用于等待页面加载、动画完成等。",
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "seconds": {
-                "type": "number",
-                "description": "等待的秒数，如 0.5, 1, 2 等"
-            }
-        },
-        "required": ["seconds"]
-    }
-}
-
 TASK_COMPLETE_TOOL = {
     "name": "task_complete",
     "description": "标记任务已完成。只有在确认任务目标已达成时才调用此工具。",
@@ -183,7 +168,6 @@ ALL_TOOLS: List[Dict[str, Any]] = [
     TYPE_TEXT_TOOL,
     HOTKEY_TOOL,
     SCROLL_TOOL,
-    WAIT_TOOL,
     TASK_COMPLETE_TOOL,
 ]
 

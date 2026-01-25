@@ -297,9 +297,6 @@ class LLMController:
             elif tool_name == "scroll":
                 return self._tool_scroll(tool_input), True, False
 
-            elif tool_name == "wait":
-                return self._tool_wait(tool_input), True, False
-
             elif tool_name == "task_complete":
                 return self._tool_task_complete(tool_input), True, True
 
@@ -459,22 +456,6 @@ class LLMController:
             return f"成功{direction}滚动 {abs(amount)} 格"
         else:
             return f"滚动失败"
-
-    def _tool_wait(self, input: Dict[str, Any]) -> str:
-        """Execute wait tool."""
-        seconds = input["seconds"]
-
-        action = Action(
-            action_type=ActionType.WAIT,
-            duration=seconds
-        )
-
-        success = self.executor.execute(action)
-
-        if success:
-            return f"等待 {seconds} 秒完成"
-        else:
-            return f"等待失败"
 
     def _tool_task_complete(self, input: Dict[str, Any]) -> str:
         """Execute task_complete tool."""
