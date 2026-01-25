@@ -764,7 +764,7 @@ class OpenAILLMController:
 
             # Filter by element type if specified
             if element_type and element_type != "Any":
-                filtered = [e for e in elements if element_type.lower() in e.control_type.lower()]
+                filtered = [e for e in elements if element_type.lower() in str(e.control_type).lower()]
                 if filtered:
                     elements = filtered
 
@@ -773,7 +773,7 @@ class OpenAILLMController:
             for i, elem in enumerate(elements[:5]):  # Limit to 5 elements
                 center = elem.center
                 result_lines.append(
-                    f"  {i+1}. '{elem.name}' ({elem.control_type}) - 坐标: ({center[0]}, {center[1]})"
+                    f"  {i+1}. '{elem.name}' ({str(elem.control_type)}) - 坐标: ({center[0]}, {center[1]})"
                 )
 
             if len(elements) > 5:
@@ -782,7 +782,7 @@ class OpenAILLMController:
             # Recommend the first element
             best = elements[0]
             center = best.center
-            result_lines.append(f"\n推荐点击: '{best.name}' at ({center[0]}, {center[1]})")
+            result_lines.append(f"\n推荐点击: '{best.name}' ({str(best.control_type)}) at ({center[0]}, {center[1]})")
 
             return "\n".join(result_lines)
 
@@ -808,7 +808,7 @@ class OpenAILLMController:
 
             # Filter by element type if specified
             if element_type and element_type != "Any":
-                filtered = [e for e in elements if element_type.lower() in e.control_type.lower()]
+                filtered = [e for e in elements if element_type.lower() in str(e.control_type).lower()]
                 if filtered:
                     elements = filtered
 
@@ -837,7 +837,7 @@ class OpenAILLMController:
             success = self.executor.execute(action)
 
             if success:
-                return f"成功{action_desc}元素 '{target.name}' ({target.control_type}) 于坐标 ({x}, {y})"
+                return f"成功{action_desc}元素 '{target.name}' ({str(target.control_type)}) 于坐标 ({x}, {y})"
             else:
                 return f"{action_desc}元素 '{target.name}' 失败"
 
