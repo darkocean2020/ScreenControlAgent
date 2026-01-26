@@ -1,4 +1,7 @@
-# ScreenControlAgent
+
+<p align="center">
+<h1 align="center"> ScreenControlAgent: An Agent Controls Your Mouse and Keyboards, Driven by ChatGPT </h1>
+</p>
 
 基于 VLM 的智能屏幕控制代理，能够理解自然语言指令并自动操作计算机完成任务。
 
