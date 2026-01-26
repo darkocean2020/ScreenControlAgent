@@ -504,61 +504,51 @@ class KnowledgeStore:
             ),
             KnowledgeEntry(
                 id="minesweeper_action_mindset",
-                title="扫雷行动指南 - 必须实际操作",
-                content="""扫雷任务执行要点 - 重要！
+                title="Minesweeper Action Guide - MUST KEEP PLAYING",
+                content="""# CRITICAL: Minesweeper Task Execution Rules
 
-## 核心原则：必须实际操作，不要放弃
+## CORE PRINCIPLE: YOU MUST KEEP PLAYING UNTIL YOU WIN
 
-**你的任务是尝试玩扫雷并争取获胜，而不是保证100%获胜。**
+**Your task is to TRY to win Minesweeper, NOT to guarantee 100% victory.**
 
-扫雷本身就是一个有运气成分的游戏，不可能保证每局都赢。但这不是放弃的理由！
+Minesweeper has luck involved - you cannot guarantee winning every game. BUT THIS IS NOT A REASON TO STOP!
 
-## 正确的执行方式
+## FORBIDDEN BEHAVIORS (DO NOT DO THESE):
+- DO NOT return a text response saying "I cannot guarantee winning"
+- DO NOT say "Minesweeper requires luck, I can't do it"
+- DO NOT stop and explain why winning is uncertain
+- DO NOT give up after just looking at the screen
 
-### 1. 立即开始游戏
-- 不要犹豫，直接点击格子开始游戏
-- 第一次点击永远不会踩雷（大多数扫雷游戏的保护机制）
-- 推荐第一次点击中间区域，可能展开更大面积
+## REQUIRED BEHAVIORS (YOU MUST DO THESE):
+1. **ALWAYS use tools** - never return just text, always call a tool
+2. **Click cells** - analyze numbers and click safe cells
+3. **If you hit a mine** - press F2 or click smiley to restart, then try again
+4. **Keep looping** until you win:
+   - look_at_screen -> analyze -> click -> repeat
 
-### 2. 持续循环操作
-重复以下循环直到游戏结束：
+## EXECUTION LOOP:
 ```
-1. look_at_screen 观察当前局面
-2. 分析数字，找出确定安全/确定是雷的格子
-3. 执行操作：点击安全格 或 右键标记雷
-4. 返回步骤1
+REPEAT FOREVER:
+1. look_at_screen - observe current board state
+2. Find a cell to click:
+   - If a number's adjacent flags = the number -> remaining cells are safe
+   - If a number's adjacent unknown cells = the number -> all are mines
+   - If uncertain, pick a corner/edge cell (lower risk)
+3. Click the cell (left click for safe, right click to flag mine)
+4. Check if won/lost:
+   - WON: call task_complete
+   - LOST: press F2 to restart, continue loop
+5. Go to step 1
 ```
 
-### 3. 不确定时的处理
-当没有100%确定的格子时：
-- **不要停下来**，选择概率最高的格子点击
-- 优先选择角落和边缘（接触的格子少，风险低）
-- 即使猜错踩雷也没关系，这是游戏的一部分
-
-### 4. 踩雷后怎么办
-- 游戏失败是正常的，不代表任务失败
-- 点击笑脸按钮（或按F2）重新开始
-- 继续尝试直到赢得一局
-
-## 错误示范 ❌
-- "我无法保证赢，所以不继续了" ← 错误！
-- "扫雷需要运气，我做不到" ← 错误！
-- 只看不点，一直分析不操作 ← 错误！
-
-## 正确示范 ✅
-- 立即点击第一个格子开始游戏
-- 根据数字逻辑推理，能确定的就操作
-- 不确定时选概率最大的，大胆点击
-- 失败了就重开，继续尝试
-- 最终赢得一局 = 任务完成
-
-## 记住
-目标是"赢得一局"，不是"保证每局都赢"。
-只要持续尝试，总会赢的！""",
+## REMEMBER:
+- Goal: "Win ONE game", not "Win every game"
+- Keep trying and you WILL eventually win!
+- NEVER give a text explanation instead of taking action!""",
                 knowledge_type=KnowledgeType.TIP,
-                tags=["minesweeper", "扫雷", "action", "行动", "mindset", "心态"],
+                tags=["minesweeper", "扫雷", "action", "win", "game", "play"],
                 app_name="Minesweeper",
-                keywords=["扫雷", "操作", "点击", "开始", "尝试", "行动", "放弃", "保证", "赢"]
+                keywords=["minesweeper", "win", "game", "play", "扫雷", "click", "cell", "mine", "flag"]
             ),
             KnowledgeEntry(
                 id="minesweeper_analysis_method",

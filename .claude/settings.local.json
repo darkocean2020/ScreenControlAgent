@@ -11,7 +11,9 @@
       "Bash(done)",
       "Bash(start /min cmd /c \"python -m src.screen_agent.main \"\"打开记事本\"\" --verbose > test_output.log 2>&1\")",
       "Bash(ls:*)",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "Bash(cd:*)",
+      "Bash(dir:*)"
     ]
   }
 }
