@@ -3,6 +3,8 @@
 <h1 align="center"> ScreenControlAgent: 一个由ChatGPT5.2（VLM）驱动的控制鼠标和键盘的Agent </h1>
 </p>
 
+[![Python Version](https://img.shields.io/badge/Python-3.10-blue.svg)](https://github.com/darkocean2020/ScreenControlAgent)
+
 基于 VLM 的智能屏幕控制代理，能够理解自然语言指令并自动操作计算机完成任务。
 
 > 目前仅支持 Windows 10/11，和1080p显示屏（运行时要把2K/4K显示屏调整成1080p）。
