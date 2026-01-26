@@ -17,7 +17,7 @@
 
 ## 前言
 
-这是一个简单的AI Hackanthon的项目，我们认为Claude Code这样的Agent的强大之处在于“本地”和“接口”，思考在云上，操作在本地，所以我们做了一个能够控制鼠标和键盘的ScreenControlAgent，尝试实现无API无接口场景的自动化。
+这是一个简单的AI Hackanthon的项目，我们认为Claude Code这样的Agent的强大之处之一在于“本地”和“接口”，将手深入电脑，可以赋予的动作范围急速扩大，所以我们做了一个能够控制鼠标和键盘的ScreenControlAgent，尝试实现无API无接口场景的自动化。
 
 在尝试不同VLM作为agent的大脑的时候，不同参数的LLM/VLM对屏幕识别，规划任务，操作精确度都有很大影响。Chatgpt-4O是参数很高的VLM，但是思考仍然有局限性，比如玩扫雷会打开Steam等等。而Chatgpt-5.2无论是决策还是速度都有很高的效率。
 
