@@ -13,7 +13,9 @@
       "Bash(ls:*)",
       "Bash(timeout:*)",
       "Bash(cd:*)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(start python run_ui.py:*)",
+      "Bash(del \"D:\\\\Github\\\\ScreenControlAgent\\\\src\\\\screen_agent\\\\brain\\\\verifier.py\")"
     ]
   }
 }

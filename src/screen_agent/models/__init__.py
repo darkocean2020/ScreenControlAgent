@@ -1,5 +1,5 @@
 """Data models for ScreenControlAgent."""
 
-from .action import Action, ActionType, AgentState
+from .action import Action, ActionType
 
-__all__ = ["Action", "ActionType", "AgentState"]
+__all__ = ["Action", "ActionType"]

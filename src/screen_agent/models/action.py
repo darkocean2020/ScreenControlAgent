@@ -1,13 +1,8 @@
-"""Data models for actions and agent state."""
+"""Data models for actions."""
 
-from dataclasses import dataclass, field
-from datetime import datetime
+from dataclasses import dataclass
 from enum import Enum
-from typing import Optional, Tuple, List, Dict, Any, TYPE_CHECKING, Callable
-from PIL import Image
-
-if TYPE_CHECKING:
-    from .task import TaskPlan, Subtask, ErrorEvent
+from typing import Optional, Tuple, List, Dict, Any
 
 
 @dataclass
@@ -68,85 +63,3 @@ class Action:
         elif self.action_type == ActionType.DONE:
             return "Task completed"
         return f"{self.action_type.value}: {self.description or ''}"
-
-
-@dataclass
-class AgentState:
-    """Represents the current state of the agent."""
-    # Core state (Phase 1)
-    current_task: str
-    step_count: int = 0
-    max_steps: int = 20
-    screenshot: Optional[Image.Image] = None
-    last_action: Optional[Action] = None
-    action_history: List[Action] = field(default_factory=list)
-    is_completed: bool = False
-    error_message: Optional[str] = None
-    started_at: datetime = field(default_factory=datetime.now)
-
-    # Phase 3: Task planning
-    task_plan: Optional[Any] = None  # TaskPlan
-    current_subtask: Optional[Any] = None  # Subtask
-    subtask_step_count: int = 0  # Steps in current subtask
-
-    # Phase 3: Error tracking
-    error_history: List[Any] = field(default_factory=list)  # List[ErrorEvent]
-    recovery_attempts: int = 0
-    last_error_type: Optional[str] = None
-
-    # Phase 3: Memory context
-    memory_context: Dict[str, Any] = field(default_factory=dict)
-
-    # Phase 3: Verification tracking
-    last_verification: Optional[Dict[str, Any]] = None
-
-    def add_action(self, action: Action) -> None:
-        """Add an action to history."""
-        self.action_history.append(action)
-        self.last_action = action
-        self.subtask_step_count += 1
-
-    def get_recent_history(self, n: int = 5) -> List[Action]:
-        """Get the n most recent actions."""
-        return self.action_history[-n:] if self.action_history else []
-
-    def record_error(self, error_event: Any) -> None:
-        """Record an error event."""
-        self.error_history.append(error_event)
-        self.last_error_type = error_event.error_type.value if hasattr(error_event, 'error_type') else str(error_event)
-
-    def reset_recovery_state(self) -> None:
-        """Reset recovery-related state for a new action."""
-        self.recovery_attempts = 0
-        self.last_error_type = None
-
-    def advance_subtask(self) -> bool:
-        """
-        Advance to the next subtask.
-
-        Returns:
-            True if advanced, False if no more subtasks
-        """
-        if self.task_plan and hasattr(self.task_plan, 'advance'):
-            self.subtask_step_count = 0
-            result = self.task_plan.advance()
-            if result and hasattr(self.task_plan, 'current_subtask'):
-                self.current_subtask = self.task_plan.current_subtask
-            return result
-        return False
-
-    def get_progress_summary(self) -> Dict[str, Any]:
-        """Get a summary of current progress."""
-        summary = {
-            "task": self.current_task,
-            "step": self.step_count,
-            "max_steps": self.max_steps,
-            "completed": self.is_completed,
-            "errors": len(self.error_history),
-            "recovery_attempts": self.recovery_attempts
-        }
-
-        if self.task_plan and hasattr(self.task_plan, 'progress'):
-            summary["subtask_progress"] = self.task_plan.progress
-
-        return summary

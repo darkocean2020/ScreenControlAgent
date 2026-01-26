@@ -1,4 +1,4 @@
-"""VLM and LLM client implementations for Claude and OpenAI."""
+"""VLM client implementations for Claude and OpenAI."""
 
 import base64
 from abc import ABC, abstractmethod
@@ -6,28 +6,6 @@ from io import BytesIO
 from typing import Optional
 
 from PIL import Image
-
-
-class LLMClient(ABC):
-    """Abstract base class for text-only LLM clients (reasoning/planning)."""
-
-    @abstractmethod
-    def reason(
-        self,
-        prompt: str,
-        system_prompt: Optional[str] = None
-    ) -> str:
-        """
-        Generate reasoning/planning based on text input.
-
-        Args:
-            prompt: User prompt with perception data
-            system_prompt: Optional system prompt
-
-        Returns:
-            Model response text
-        """
-        pass
 
 
 class VLMClient(ABC):
@@ -164,72 +142,4 @@ class OpenAIVLMClient(VLMClient):
             max_tokens=4096
         )
 
-        return response.choices[0].message.content
-
-
-# ============================================================================
-# LLM Clients (Text-only, for reasoning/planning)
-# ============================================================================
-
-class ClaudeLLMClient(LLMClient):
-    """Claude API client for text-only reasoning tasks."""
-
-    def __init__(self, api_key: str, model: str = "claude-3-5-sonnet-20241022"):
-        """
-        Initialize Claude LLM client.
-
-        Args:
-            api_key: Anthropic API key
-            model: Model name to use
-        """
-        import anthropic
-        self.client = anthropic.Anthropic(api_key=api_key)
-        self.model = model
-
-    def reason(
-        self,
-        prompt: str,
-        system_prompt: Optional[str] = None
-    ) -> str:
-        """Generate reasoning using Claude (text-only)."""
-        response = self.client.messages.create(
-            model=self.model,
-            max_tokens=1024,
-            system=system_prompt or "",
-            messages=[{"role": "user", "content": prompt}]
-        )
-        return response.content[0].text
-
-
-class OpenAILLMClient(LLMClient):
-    """OpenAI client for text-only reasoning tasks."""
-
-    def __init__(self, api_key: str, model: str = "gpt-4o"):
-        """
-        Initialize OpenAI LLM client.
-
-        Args:
-            api_key: OpenAI API key
-            model: Model name to use (gpt-4o, gpt-4o-mini, etc.)
-        """
-        import openai
-        self.client = openai.OpenAI(api_key=api_key)
-        self.model = model
-
-    def reason(
-        self,
-        prompt: str,
-        system_prompt: Optional[str] = None
-    ) -> str:
-        """Generate reasoning using OpenAI (text-only)."""
-        messages = []
-        if system_prompt:
-            messages.append({"role": "system", "content": system_prompt})
-        messages.append({"role": "user", "content": prompt})
-
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            max_tokens=1024
-        )
         return response.choices[0].message.content

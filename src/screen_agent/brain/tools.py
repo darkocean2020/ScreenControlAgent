@@ -263,11 +263,3 @@ ALL_TOOLS: List[Dict[str, Any]] = [
 def get_tool_names() -> List[str]:
     """Get list of all tool names."""
     return [tool["name"] for tool in ALL_TOOLS]
-
-
-def get_tool_by_name(name: str) -> Dict[str, Any]:
-    """Get tool definition by name."""
-    for tool in ALL_TOOLS:
-        if tool["name"] == name:
-            return tool
-    return None
