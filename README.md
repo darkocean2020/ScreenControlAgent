@@ -37,10 +37,16 @@
 ## 案例
 
 任务：打开记事本，写一个一句话小故事，保存。新建一个项目，另外写一个一句话小故事，保存。
+
+
 https://github.com/user-attachments/assets/a1b2538f-a985-4f58-a813-e2aa9f845817
 
+
 任务：上Chrome，去ChatGPT，问问 “什么有助于睡眠”。
+
+
 https://github.com/user-attachments/assets/c7152ca6-bf79-4fc6-b1ff-9a798ba250bd
+
 
 ## 希望未来能解决的痛点
 
