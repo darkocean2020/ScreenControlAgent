@@ -724,46 +724,109 @@ class OpenAILLMController:
             logger.error(f"VLM analysis failed: {e}")
             return f"VLM 分析失败: {str(e)}\n\nUI 元素列表:\n{element_context}"
 
+    def _uia_correct_coordinates(
+        self, x: int, y: int, element_name: str
+    ) -> Tuple[int, int, bool]:
+        """Try to correct coordinates using UIAutomation.
+
+        When element_name is provided and UIAutomation is available, looks up
+        the element by name and picks the match closest to the VLM-estimated
+        (x, y). This combines VLM semantic understanding with UIAutomation
+        pixel-perfect positioning.
+
+        Returns:
+            (final_x, final_y, uia_used) tuple
+        """
+        if not element_name or not self.uia_client or not self.uia_client.is_available():
+            return x, y, False
+
+        try:
+            ui_tree = self.uia_client.get_element_tree()
+            elements = ui_tree.find_by_name(element_name, partial=True)
+
+            if not elements:
+                return x, y, False
+
+            # Pick the element closest to the VLM-estimated coordinates
+            best_element = None
+            best_distance = float('inf')
+            for elem in elements:
+                if elem.bounding_rect and elem.is_enabled:
+                    cx, cy = elem.center
+                    dist = ((cx - x) ** 2 + (cy - y) ** 2) ** 0.5
+                    if dist < best_distance:
+                        best_distance = dist
+                        best_element = elem
+
+            if best_element and best_element.center:
+                final_x, final_y = best_element.center
+                if best_distance > 5:
+                    logger.info(
+                        f"UIAutomation corrected coordinates for '{element_name}': "
+                        f"({x}, {y}) -> ({final_x}, {final_y}), "
+                        f"distance={best_distance:.0f}px"
+                    )
+                return final_x, final_y, True
+
+        except Exception as e:
+            logger.warning(f"UIAutomation lookup failed for '{element_name}': {e}")
+
+        return x, y, False
+
     def _tool_click(self, input: Dict[str, Any]) -> str:
-        """Execute click tool."""
+        """Execute click tool with automatic UIAutomation coordinate correction."""
         x = input["x"]
         y = input["y"]
         element_name = input.get("element_name", "")
+
+        final_x, final_y, uia_used = self._uia_correct_coordinates(x, y, element_name)
 
         action = Action(
             action_type=ActionType.CLICK,
-            coordinates=(x, y),
-            description=f"Click on {element_name}" if element_name else f"Click at ({x}, {y})"
+            coordinates=(final_x, final_y),
+            description=f"Click on {element_name}" if element_name else f"Click at ({final_x}, {final_y})"
         )
 
         success = self.executor.execute(action)
 
         if success:
-            return f"成功点击坐标 ({x}, {y})" + (f" - {element_name}" if element_name else "")
+            msg = f"成功点击坐标 ({final_x}, {final_y})"
+            if element_name:
+                msg += f" - {element_name}"
+            if uia_used:
+                msg += " (UIAutomation 精确定位)"
+            return msg
         else:
-            return f"点击失败: ({x}, {y})"
+            return f"点击失败: ({final_x}, {final_y})"
 
     def _tool_double_click(self, input: Dict[str, Any]) -> str:
-        """Execute double_click tool."""
+        """Execute double_click tool with automatic UIAutomation coordinate correction."""
         x = input["x"]
         y = input["y"]
         element_name = input.get("element_name", "")
 
+        final_x, final_y, uia_used = self._uia_correct_coordinates(x, y, element_name)
+
         action = Action(
             action_type=ActionType.DOUBLE_CLICK,
-            coordinates=(x, y),
-            description=f"Double-click on {element_name}" if element_name else f"Double-click at ({x}, {y})"
+            coordinates=(final_x, final_y),
+            description=f"Double-click on {element_name}" if element_name else f"Double-click at ({final_x}, {final_y})"
         )
 
         success = self.executor.execute(action)
 
         if success:
-            return f"成功双击坐标 ({x}, {y})" + (f" - {element_name}" if element_name else "")
+            msg = f"成功双击坐标 ({final_x}, {final_y})"
+            if element_name:
+                msg += f" - {element_name}"
+            if uia_used:
+                msg += " (UIAutomation 精确定位)"
+            return msg
         else:
-            return f"双击失败: ({x}, {y})"
+            return f"双击失败: ({final_x}, {final_y})"
 
     def _tool_right_click(self, input: Dict[str, Any]) -> str:
-        """Execute right_click tool."""
+        """Execute right_click tool with automatic UIAutomation coordinate correction."""
         x = input["x"]
         y = input["y"]
 
