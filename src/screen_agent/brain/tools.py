@@ -27,7 +27,7 @@ LOOK_AT_SCREEN_TOOL = {
 
 CLICK_TOOL = {
     "name": "click",
-    "description": "在指定坐标点击鼠标左键。坐标从屏幕左上角(0,0)开始。\n\n**警告**: 直接使用坐标点击容易因坐标不精确而失败。请优先使用 click_element(name) 工具，仅在 click_element 找不到目标元素时才使用此工具。\n如果必须使用此工具，请务必填写 element_name 参数以启用自动坐标校正。",
+    "description": "在指定坐标点击鼠标左键。坐标从屏幕左上角(0,0)开始。",
     "input_schema": {
         "type": "object",
         "properties": {
@@ -41,7 +41,7 @@ CLICK_TOOL = {
             },
             "element_name": {
                 "type": "string",
-                "description": "目标元素名称（强烈建议提供！系统会自动使用 UIAutomation 校正坐标，大幅提高点击精度）"
+                "description": "目标元素名称（用于日志记录，可选）"
             }
         },
         "required": ["x", "y"]
@@ -165,7 +165,7 @@ TASK_COMPLETE_TOOL = {
 
 FIND_ELEMENT_TOOL = {
     "name": "find_element",
-    "description": "【首选】通过名称或文本查找屏幕上的UI元素，返回精确坐标（像素级精度）。使用 Windows Accessibility API，精度远超截图估计。在点击任何UI元素之前应先调用此工具或 click_element。",
+    "description": "通过名称或文本查找屏幕上的UI元素，返回精确坐标。优先使用此工具获取按钮、输入框等元素的准确位置，而不是从截图估计坐标。",
     "input_schema": {
         "type": "object",
         "properties": {
@@ -185,7 +185,7 @@ FIND_ELEMENT_TOOL = {
 
 CLICK_ELEMENT_TOOL = {
     "name": "click_element",
-    "description": "【首选点击方式】通过名称直接点击UI元素，无需手动指定坐标。系统使用 Windows Accessibility API 自动查找元素并点击其精确中心位置。精度和可靠性远超手动指定坐标的 click(x,y) 工具。只有当此工具找不到目标元素时，才应使用 click(x,y) 工具。",
+    "description": "通过名称直接点击UI元素，无需手动指定坐标。系统会自动查找元素并点击其中心位置。这比手动指定坐标更准确可靠。",
     "input_schema": {
         "type": "object",
         "properties": {
