@@ -127,32 +127,7 @@ class MouseController:
             x: Optional X position to scroll at
             y: Optional Y position to scroll at
         """
-        import time
-
-        if x is None or y is None:
-            # Move to center of screen first to ensure we scroll the main content area
-            screen_width, screen_height = pyautogui.size()
-            center_x = screen_width // 2
-            center_y = screen_height // 2
-            self.move_to(center_x, center_y)
-            time.sleep(0.15)
-            target_x, target_y = None, None
-        else:
-            target_x, target_y = x, y
-
-        # Amplify scroll amount 100x for visible effect
-        clicks = clicks * 100
-
-        # Scroll in multiple smaller steps so the OS/browser processes each one
-        step = 3 if clicks > 0 else -3
-        remaining = abs(clicks)
-        while remaining > 0:
-            batch = min(remaining, 3)
-            actual = batch if clicks > 0 else -batch
-            pyautogui.scroll(actual, x=target_x, y=target_y)
-            remaining -= batch
-            if remaining > 0:
-                time.sleep(0.05)
+        pyautogui.scroll(clicks, x=x, y=y)
 
     def drag_to(self, x: int, y: int, duration: float = 0.5, button: str = "left") -> None:
         """
