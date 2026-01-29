@@ -10,6 +10,7 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any, Callable, Tuple
 
 import openai
+from PIL import Image
 
 from ..models.action import Action, ActionType
 from ..models.task import Subtask, TaskPlan, SubtaskStatus
@@ -656,8 +657,24 @@ class OpenAILLMController:
         """Execute look_at_screen tool using the main LLM as VLM."""
         import base64
         from io import BytesIO
+        import pyautogui
 
         screenshot = self.screen_capture.capture()
+
+        # Resize screenshot to logical screen resolution so VLM coordinate
+        # estimates match pyautogui's logical coordinate space.
+        # On high-DPI displays, mss captures at physical pixels (e.g. 2560x1440)
+        # while pyautogui operates at logical pixels (e.g. 1707x960 at 150% scale).
+        logical_size = pyautogui.size()  # (logical_width, logical_height)
+        if screenshot.size != (logical_size.width, logical_size.height):
+            logger.info(
+                f"Resizing screenshot from {screenshot.size} to "
+                f"({logical_size.width}, {logical_size.height}) for DPI alignment"
+            )
+            screenshot = screenshot.resize(
+                (logical_size.width, logical_size.height),
+                Image.LANCZOS
+            )
         screen_size = screenshot.size
 
         element_context = ""
