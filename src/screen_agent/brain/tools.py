@@ -27,7 +27,7 @@ LOOK_AT_SCREEN_TOOL = {
 
 CLICK_TOOL = {
     "name": "click",
-    "description": "在指定坐标点击鼠标左键。坐标从屏幕左上角(0,0)开始。",
+    "description": "在指定坐标点击鼠标左键。坐标从屏幕左上角(0,0)开始。\n\n**警告**: 直接使用坐标点击容易因坐标不精确而失败。请优先使用 click_element(name) 工具，仅在 click_element 找不到目标元素时才使用此工具。\n如果必须使用此工具，请务必填写 element_name 参数以启用自动坐标校正。",
     "input_schema": {
         "type": "object",
         "properties": {
@@ -41,7 +41,7 @@ CLICK_TOOL = {
             },
             "element_name": {
                 "type": "string",
-                "description": "目标元素名称（用于日志记录，可选）"
+                "description": "目标元素名称（强烈建议提供！系统会自动使用 UIAutomation 校正坐标，大幅提高点击精度）"
             }
         },
         "required": ["x", "y"]
@@ -165,7 +165,7 @@ TASK_COMPLETE_TOOL = {
 
 FIND_ELEMENT_TOOL = {
     "name": "find_element",
-    "description": "通过名称或文本查找屏幕上的UI元素，返回精确坐标。优先使用此工具获取按钮、输入框等元素的准确位置，而不是从截图估计坐标。",
+    "description": "【首选】通过名称或文本查找屏幕上的UI元素，返回精确坐标（像素级精度）。使用 Windows Accessibility API，精度远超截图估计。在点击任何UI元素之前应先调用此工具或 click_element。",
     "input_schema": {
         "type": "object",
         "properties": {
@@ -185,7 +185,7 @@ FIND_ELEMENT_TOOL = {
 
 CLICK_ELEMENT_TOOL = {
     "name": "click_element",
-    "description": "通过名称直接点击UI元素，无需手动指定坐标。系统会自动查找元素并点击其中心位置。这比手动指定坐标更准确可靠。",
+    "description": "【首选点击方式】通过名称直接点击UI元素，无需手动指定坐标。系统使用 Windows Accessibility API 自动查找元素并点击其精确中心位置。精度和可靠性远超手动指定坐标的 click(x,y) 工具。只有当此工具找不到目标元素时，才应使用 click(x,y) 工具。",
     "input_schema": {
         "type": "object",
         "properties": {
@@ -244,9 +244,55 @@ USE_SKILL_TOOL = {
     }
 }
 
+# =============================================================================
+# Set-of-Mark (SoM) Tools
+# =============================================================================
+
+LOOK_AT_SCREEN_SOM_TOOL = {
+    "name": "look_at_screen_som",
+    "description": "查看当前屏幕内容，并在所有可交互元素上标注编号标记 [1], [2], [3]... "
+                   "返回标注后的屏幕描述和编号-元素映射表。"
+                   "使用此工具后，可以直接调用 click_mark(mark_id) 精确点击标记的元素。"
+                   "特别适用于网页内容（Twitter、Google等）和复杂界面。",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "focus_hint": {
+                "type": "string",
+                "description": "可选的关注提示，告诉视觉模型重点关注什么"
+            }
+        },
+        "required": []
+    }
+}
+
+CLICK_MARK_TOOL = {
+    "name": "click_mark",
+    "description": "点击 Set-of-Mark 标注的元素。必须先调用 look_at_screen_som 获取标记编号。"
+                   "此工具使用精确坐标，精度远超手动估计坐标。",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "mark_id": {
+                "type": "integer",
+                "description": "要点击的标记编号，如 1, 2, 3..."
+            },
+            "click_type": {
+                "type": "string",
+                "description": "点击类型（可选），默认为单击",
+                "enum": ["single", "double", "right"],
+                "default": "single"
+            }
+        },
+        "required": ["mark_id"]
+    }
+}
+
 # All tools list
 ALL_TOOLS: List[Dict[str, Any]] = [
     LOOK_AT_SCREEN_TOOL,
+    LOOK_AT_SCREEN_SOM_TOOL,
+    CLICK_MARK_TOOL,
     FIND_ELEMENT_TOOL,
     CLICK_ELEMENT_TOOL,
     USE_SKILL_TOOL,

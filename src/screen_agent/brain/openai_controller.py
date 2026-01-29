@@ -10,16 +10,21 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any, Callable, Tuple
 
 import openai
+from PIL import Image
 
 from ..models.action import Action, ActionType
 from ..models.task import Subtask, TaskPlan, SubtaskStatus
 from ..perception.screen_capture import ScreenCapture
 from ..perception.vlm_client import VLMClient
+from ..perception.som_annotator import SoMAnnotator
+from ..perception.element_detector import HybridElementDetector
+from ..models.som_element import SoMElement
+from ..models.ui_element import BoundingRect
 from ..action.executor import ActionExecutor
 from ..memory.memory_manager import MemoryManager
 from ..utils.logger import get_logger
 from .tools import ALL_TOOLS
-from .prompts import CONTROLLER_SYSTEM_PROMPT, LOOK_AT_SCREEN_PROMPT
+from .prompts import CONTROLLER_SYSTEM_PROMPT, LOOK_AT_SCREEN_PROMPT, SOM_SCREEN_PROMPT
 from .task_planner import TaskPlanner
 from .reflection import ReflectionWorkflow, ReflectionResult
 
@@ -191,6 +196,28 @@ class OpenAILLMController:
                 logger.info("Skills system initialized")
             except Exception as e:
                 logger.warning(f"Failed to initialize Skills: {e}")
+
+        # SoM (Set-of-Mark) annotator and current mark map
+        self.som_annotator = SoMAnnotator()
+        self._current_som_map: Dict[int, SoMElement] = {}
+
+        # CDP client for Chrome web elements (graceful if unavailable)
+        self.cdp_client = None
+        try:
+            from ..perception.cdp_client import CDPClient
+            self.cdp_client = CDPClient()
+            if self.cdp_client.is_available():
+                logger.info("CDP client initialized - Chrome debug port available")
+            else:
+                logger.info("CDP client initialized - Chrome debug port not detected (will retry on use)")
+        except ImportError:
+            logger.info("CDP client not available (websocket-client not installed)")
+
+        # Hybrid element detector (UIAutomation + CDP)
+        self.element_detector = HybridElementDetector(
+            uia_client=self.uia_client,
+            cdp_client=self.cdp_client,
+        )
 
         # State
         self.state: Optional[ControllerState] = None
@@ -472,7 +499,7 @@ class OpenAILLMController:
         actions = []
         for call in self.state.tool_call_history[-10:]:
             tool = call.get("tool", "")
-            if tool not in ["look_at_screen", "task_complete"]:
+            if tool not in ["look_at_screen", "look_at_screen_som", "task_complete"]:
                 actions.append(tool)
 
         if len(actions) >= 2:
@@ -557,7 +584,7 @@ class OpenAILLMController:
                 })
 
                 # Track subtask actions
-                if self.state.current_subtask and tool_name not in ["look_at_screen"]:
+                if self.state.current_subtask and tool_name not in ["look_at_screen", "look_at_screen_som"]:
                     action_desc = self._format_action_description(tool_name, tool_input)
                     self.state.subtask_actions.append(action_desc)
 
@@ -611,42 +638,52 @@ class OpenAILLMController:
         tool_input: Dict[str, Any]
     ) -> Tuple[str, bool, bool]:
         """Execute a tool and return the result."""
+        # Tools that change screen state → invalidate SoM map afterwards
+        _ACTION_TOOLS = {
+            "click", "double_click", "right_click", "type_text",
+            "hotkey", "scroll", "click_element", "click_mark", "use_skill",
+        }
+
         try:
             if tool_name == "look_at_screen":
-                return self._tool_look_at_screen(tool_input), True, False
+                result = self._tool_look_at_screen(tool_input)
+                return result, True, False
 
+            elif tool_name == "look_at_screen_som":
+                result = self._tool_look_at_screen_som(tool_input)
+                return result, True, False
+
+            elif tool_name == "click_mark":
+                result = self._tool_click_mark(tool_input)
             elif tool_name == "click":
-                return self._tool_click(tool_input), True, False
-
+                result = self._tool_click(tool_input)
             elif tool_name == "double_click":
-                return self._tool_double_click(tool_input), True, False
-
+                result = self._tool_double_click(tool_input)
             elif tool_name == "right_click":
-                return self._tool_right_click(tool_input), True, False
-
+                result = self._tool_right_click(tool_input)
             elif tool_name == "type_text":
-                return self._tool_type_text(tool_input), True, False
-
+                result = self._tool_type_text(tool_input)
             elif tool_name == "hotkey":
-                return self._tool_hotkey(tool_input), True, False
-
+                result = self._tool_hotkey(tool_input)
             elif tool_name == "scroll":
-                return self._tool_scroll(tool_input), True, False
-
+                result = self._tool_scroll(tool_input)
             elif tool_name == "find_element":
-                return self._tool_find_element(tool_input), True, False
-
+                result = self._tool_find_element(tool_input)
             elif tool_name == "click_element":
-                return self._tool_click_element(tool_input), True, False
-
+                result = self._tool_click_element(tool_input)
             elif tool_name == "use_skill":
-                return self._tool_use_skill(tool_input), True, False
-
+                result = self._tool_use_skill(tool_input)
             elif tool_name == "task_complete":
-                return self._tool_task_complete(tool_input), True, True
-
+                result = self._tool_task_complete(tool_input)
+                return result, True, True
             else:
                 return f"Unknown tool: {tool_name}", False, False
+
+            # Invalidate SoM map after any action that changes screen state
+            if tool_name in _ACTION_TOOLS and self._current_som_map:
+                self._current_som_map.clear()
+
+            return result, True, False
 
         except Exception as e:
             logger.error(f"Tool execution failed: {e}")
@@ -656,8 +693,24 @@ class OpenAILLMController:
         """Execute look_at_screen tool using the main LLM as VLM."""
         import base64
         from io import BytesIO
+        import pyautogui
 
         screenshot = self.screen_capture.capture()
+
+        # Resize screenshot to logical screen resolution so VLM coordinate
+        # estimates match pyautogui's logical coordinate space.
+        # On high-DPI displays, mss captures at physical pixels (e.g. 2560x1440)
+        # while pyautogui operates at logical pixels (e.g. 1707x960 at 150% scale).
+        logical_size = pyautogui.size()
+        if screenshot.size != (logical_size.width, logical_size.height):
+            logger.info(
+                f"Resizing screenshot from {screenshot.size} to "
+                f"({logical_size.width}, {logical_size.height}) for DPI alignment"
+            )
+            screenshot = screenshot.resize(
+                (logical_size.width, logical_size.height),
+                Image.LANCZOS
+            )
         screen_size = screenshot.size
 
         element_context = ""
@@ -707,43 +760,231 @@ class OpenAILLMController:
             logger.error(f"VLM analysis failed: {e}")
             return f"VLM 分析失败: {str(e)}\n\nUI 元素列表:\n{element_context}"
 
+    def _tool_look_at_screen_som(self, input: Dict[str, Any]) -> str:
+        """Execute look_at_screen_som tool: annotate screenshot with numbered marks."""
+        import base64
+        from io import BytesIO
+        import pyautogui
+
+        screenshot = self.screen_capture.capture()
+
+        # DPI alignment: resize to logical resolution
+        logical_size = pyautogui.size()
+        if screenshot.size != (logical_size.width, logical_size.height):
+            logger.info(
+                f"SoM: Resizing screenshot from {screenshot.size} to "
+                f"({logical_size.width}, {logical_size.height}) for DPI alignment"
+            )
+            screenshot = screenshot.resize(
+                (logical_size.width, logical_size.height),
+                Image.LANCZOS
+            )
+
+        # Collect interactive elements from all sources (UIAutomation + CDP)
+        som_elements = self.element_detector.detect()
+        logger.info(f"SoM: Detected {len(som_elements)} interactive elements")
+
+        if not som_elements:
+            return "SoM: 未检测到可交互元素。请使用 look_at_screen 工具查看屏幕。"
+
+        # Annotate screenshot
+        annotated_img, mark_map = self.som_annotator.annotate(screenshot, som_elements)
+        self._current_som_map = mark_map
+
+        logger.info(f"SoM: Annotated {len(mark_map)} marks on screenshot")
+
+        # Build mark details text
+        mark_lines = []
+        for mid in sorted(mark_map.keys()):
+            elem = mark_map[mid]
+            cx, cy = elem.center
+            mark_lines.append(f"[{mid}] {elem.element_type}: \"{elem.name}\" at ({cx}, {cy})")
+        mark_details = "\n".join(mark_lines)
+
+        focus_hint = input.get("focus_hint", "")
+
+        prompt = SOM_SCREEN_PROMPT.format(
+            screen_width=annotated_img.size[0],
+            screen_height=annotated_img.size[1],
+            focus_hint=f"\n重点关注: {focus_hint}" if focus_hint else "",
+            mark_details=mark_details
+        )
+
+        # Send annotated screenshot to VLM
+        try:
+            buffer = BytesIO()
+            annotated_img.save(buffer, format="PNG")
+            image_b64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
+
+            response = self.client.chat.completions.create(
+                model=self.model,
+                max_completion_tokens=1024,
+                messages=[
+                    {"role": "system", "content": "你是一个视觉观察助手，客观准确地描述标注了编号标记的屏幕内容。"},
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "image_url",
+                                "image_url": {"url": f"data:image/png;base64,{image_b64}"}
+                            },
+                            {"type": "text", "text": prompt}
+                        ]
+                    }
+                ]
+            )
+            vlm_result = response.choices[0].message.content
+
+            # Append available marks summary
+            vlm_result += f"\n\n可用标记: {len(mark_map)} 个元素已标注。使用 click_mark(mark_id) 精确点击。"
+            return vlm_result
+
+        except Exception as e:
+            logger.error(f"SoM VLM analysis failed: {e}")
+            return f"SoM VLM 分析失败: {str(e)}\n\n标记列表:\n{mark_details}"
+
+    def _tool_click_mark(self, input: Dict[str, Any]) -> str:
+        """Execute click_mark tool: click a SoM-annotated element by mark ID."""
+        mark_id = input["mark_id"]
+        click_type = input.get("click_type", "single")
+
+        if not self._current_som_map:
+            return "没有可用的 SoM 标记。请先调用 look_at_screen_som 获取标记。"
+
+        if mark_id not in self._current_som_map:
+            available = sorted(self._current_som_map.keys())
+            return (
+                f"标记 [{mark_id}] 不存在。"
+                f"可用标记: {available[:20]}{'...' if len(available) > 20 else ''}"
+            )
+
+        elem = self._current_som_map[mark_id]
+        x, y = elem.center
+
+        # Determine action type
+        if click_type == "double":
+            action_type = ActionType.DOUBLE_CLICK
+            action_desc = "双击"
+        elif click_type == "right":
+            action_type = ActionType.RIGHT_CLICK
+            action_desc = "右键点击"
+        else:
+            action_type = ActionType.CLICK
+            action_desc = "点击"
+
+        action = Action(
+            action_type=action_type,
+            coordinates=(x, y),
+            description=f"SoM {action_desc} [{mark_id}] '{elem.name}'"
+        )
+
+        success = self.executor.execute(action)
+
+        if success:
+            return f"成功{action_desc}标记 [{mark_id}] '{elem.name}' ({elem.element_type}) 于坐标 ({x}, {y})"
+        else:
+            return f"{action_desc}标记 [{mark_id}] 失败"
+
+    def _uia_correct_coordinates(
+        self, x: int, y: int, element_name: str
+    ) -> Tuple[int, int, bool]:
+        """Try to correct coordinates using UIAutomation.
+
+        When element_name is provided and UIAutomation is available, looks up
+        the element by name and picks the match closest to the VLM-estimated
+        (x, y). This combines VLM semantic understanding with UIAutomation
+        pixel-perfect positioning.
+
+        Returns:
+            (final_x, final_y, uia_used) tuple
+        """
+        if not element_name or not self.uia_client or not self.uia_client.is_available():
+            return x, y, False
+
+        try:
+            ui_tree = self.uia_client.get_element_tree()
+            elements = ui_tree.find_by_name(element_name, partial=True)
+
+            if not elements:
+                return x, y, False
+
+            # Pick the element closest to the VLM-estimated coordinates
+            best_element = None
+            best_distance = float('inf')
+            for elem in elements:
+                if elem.bounding_rect and elem.is_enabled:
+                    cx, cy = elem.center
+                    dist = ((cx - x) ** 2 + (cy - y) ** 2) ** 0.5
+                    if dist < best_distance:
+                        best_distance = dist
+                        best_element = elem
+
+            if best_element and best_element.center:
+                final_x, final_y = best_element.center
+                if best_distance > 5:
+                    logger.info(
+                        f"UIAutomation corrected coordinates for '{element_name}': "
+                        f"({x}, {y}) -> ({final_x}, {final_y}), "
+                        f"distance={best_distance:.0f}px"
+                    )
+                return final_x, final_y, True
+
+        except Exception as e:
+            logger.warning(f"UIAutomation lookup failed for '{element_name}': {e}")
+
+        return x, y, False
+
     def _tool_click(self, input: Dict[str, Any]) -> str:
-        """Execute click tool."""
+        """Execute click tool with automatic UIAutomation coordinate correction."""
         x = input["x"]
         y = input["y"]
         element_name = input.get("element_name", "")
+
+        final_x, final_y, uia_used = self._uia_correct_coordinates(x, y, element_name)
 
         action = Action(
             action_type=ActionType.CLICK,
-            coordinates=(x, y),
-            description=f"Click on {element_name}" if element_name else f"Click at ({x}, {y})"
+            coordinates=(final_x, final_y),
+            description=f"Click on {element_name}" if element_name else f"Click at ({final_x}, {final_y})"
         )
 
         success = self.executor.execute(action)
 
         if success:
-            return f"成功点击坐标 ({x}, {y})" + (f" - {element_name}" if element_name else "")
+            msg = f"成功点击坐标 ({final_x}, {final_y})"
+            if element_name:
+                msg += f" - {element_name}"
+            if uia_used:
+                msg += " (UIAutomation 精确定位)"
+            return msg
         else:
-            return f"点击失败: ({x}, {y})"
+            return f"点击失败: ({final_x}, {final_y})"
 
     def _tool_double_click(self, input: Dict[str, Any]) -> str:
-        """Execute double_click tool."""
+        """Execute double_click tool with automatic UIAutomation coordinate correction."""
         x = input["x"]
         y = input["y"]
         element_name = input.get("element_name", "")
 
+        final_x, final_y, uia_used = self._uia_correct_coordinates(x, y, element_name)
+
         action = Action(
             action_type=ActionType.DOUBLE_CLICK,
-            coordinates=(x, y),
-            description=f"Double-click on {element_name}" if element_name else f"Double-click at ({x}, {y})"
+            coordinates=(final_x, final_y),
+            description=f"Double-click on {element_name}" if element_name else f"Double-click at ({final_x}, {final_y})"
         )
 
         success = self.executor.execute(action)
 
         if success:
-            return f"成功双击坐标 ({x}, {y})" + (f" - {element_name}" if element_name else "")
+            msg = f"成功双击坐标 ({final_x}, {final_y})"
+            if element_name:
+                msg += f" - {element_name}"
+            if uia_used:
+                msg += " (UIAutomation 精确定位)"
+            return msg
         else:
-            return f"双击失败: ({x}, {y})"
+            return f"双击失败: ({final_x}, {final_y})"
 
     def _tool_right_click(self, input: Dict[str, Any]) -> str:
         """Execute right_click tool."""
@@ -994,6 +1235,11 @@ class OpenAILLMController:
             name = tool_input.get("name", "")
             click_type = tool_input.get("click_type", "single")
             return f"Click element: '{name}' ({click_type})"
+
+        elif tool_name == "click_mark":
+            mark_id = tool_input.get("mark_id", "?")
+            click_type = tool_input.get("click_type", "single")
+            return f"Click mark [{mark_id}] ({click_type})"
 
         elif tool_name == "use_skill":
             skill = tool_input.get("skill_name", "")
